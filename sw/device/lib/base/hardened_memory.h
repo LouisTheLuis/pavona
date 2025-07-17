@@ -95,6 +95,20 @@ hardened_bool_t hardened_memeq(const uint32_t *lhs, const uint32_t *rhs,
                                size_t word_len);
 
 /**
+ * Combines two word buffers with XOR.
+ *
+ * Callers should ensure the entropy complex is up before calling this
+ * function. The implementation uses random-order hardening primitives for
+ * side-channel defense.
+ *
+ * @param[in,out] x Pointer to the first operand (modified in-place).
+ * @param y Pointer to the second operand.
+ * @param word_len Length in words of each operand.
+ */
+void hardened_xor(uint32_t *OT_RESTRICT x, const uint32_t *OT_RESTRICT y,
+                  size_t word_len);
+
+/**
  * Writes 32-bit words into an MMIO location.
  *
  * Similar to `hardened_memcpy`, but treats the destination as volatile.
