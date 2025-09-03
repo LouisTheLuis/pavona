@@ -1,3 +1,7 @@
+/* Copyright zeroRISC Inc. */
+/* Licensed under the Apache License, Version 2.0, see LICENSE for details. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* Copyright lowRISC contributors (OpenTitan project). */
 /* Licensed under the Apache License, Version 2.0, see LICENSE for details. */
 /* SPDX-License-Identifier: Apache-2.0 */
@@ -10,8 +14,13 @@
 .globl relprime_f4
 .globl check_p
 .globl check_q
+.globl modinv
 .globl modinv_f4
 .globl relprime_small_primes
+
+.globl prepare_pm1qm1
+.globl derive_d
+.globl derive_crt_component
 
 /**
  * Generate a random RSA key pair.
@@ -70,12 +79,98 @@ rsa_keygen:
   jal      x1, bignum_mul
 
   /* Derive the private exponent d from p and q.
-       x2 <= zero if d is OK, otherwise nonzero */
+       x2 <= zero if d is OK, otherwise nonzero 
+       dmem[rsa_p..rsa_p+(plen*32)] <= p - 1. 
+       dmem[rsa_p..rsa_p+(plen*32)] <= q - 1. */
   jal      x1, derive_d
 
-  /* Check that d is large enough (tail-call). If d is not large enough,
+  /* Check that d is large enough. If d is not large enough,
      then `check_d` will restart the key-generation process. */
-  jal      x0, check_d
+  jal      x1, check_d
+
+  /* Restore constants from above for use in `prepare_pm1qm1`.
+       x20 <= 20
+       x31 <= x30 - 1 */
+  li       x20, 20
+  addi     x2, x0, 1
+  sub      x31, x30, x2
+
+  /* Compute p - 1 and q - 1.
+       dmem[rsa_pm1..rsa_pm1+(plen*32)] <= p - 1. 
+       dmem[rsa_qm1..rsa_qm1+(plen*32)] <= q - 1. */
+  jal      x1, prepare_pm1qm1 
+
+  /* Compute CRT component d_p. 
+       dmem[rsa_d_p..rsa_d_p+(plen*32)] <= d mod (p - 1). */
+  la       x10, rsa_d_p 
+  la       x11, rsa_pm1
+  jal      x1, derive_crt_component
+
+  /* Compute CRT component d_q. 
+       dmem[rsa_d_q..rsa_d_q+(plen*32)] <= d mod (q - 1). */
+  la       x10, rsa_d_q 
+  la       x11, rsa_qm1
+  jal      x1, derive_crt_component
+
+  /* Compute CRT coefficient i_q, the inverse of q mod p 
+     (tail-call).
+       dmem[rsa_i_q..rsa_i_q+(plen*32)] <= q^(-1) mod p. */
+  la       x11, rsa_q
+  la       x12, rsa_p
+  la       x13, rsa_i_q
+  la       x14, rsa_pm1
+  la       x15, rsa_qm1
+  la       x16, mont_m0inv
+  la       x17, mont_rr
+  la       x18, tmp_scratchpad
+  jal      x0, modinv
+
+
+/**
+ * Subtract one from both RSA cofactors p and q, in preparation for computation
+ * of the CRT components of the RSA private exponent d.
+ *
+ * This function writes p-1 and q-1 to the regions of memory following the
+ * labels `rsa_pm1` and `rsa_qm1` respectively.
+ *
+ * Flags: Flags have no meaning beyond the scope of this subroutine.
+ *
+ * @param[in] dmem[rsa_p..rsa_p+(plen*32)]: first prime p
+ * @param[in] dmem[rsa_q..rsa_q+(plen*32)]: second prime q
+ * @param[in]  x20: 20, constant
+ * @param[in]  x31: plen-1, number of 256-bit limbs for p and q minus one
+ * @param[out] dmem[rsa_pm1..rsa_pm1+(plen*32)]: result, p-1
+ * @param[out] dmem[rsa_qm1..rsa_qm1+(plen*32)]: result, q-1
+ * clobbered registers: x10, x11, w20
+ * clobbered flag groups: none
+ */
+prepare_pm1qm1:
+  /* Subtract 1 from p (no carry from lowest limb since p is odd).
+       dmem[rsa_p..rsa_p+(plen*32)] <= p - 1 */
+  la       x10, rsa_p
+  la       x11, rsa_pm1
+  bn.lid   x20, 0(x10++)
+  bn.subi  w20, w20, 1
+  bn.sid   x20, 0(x11++)
+
+  loop     x31, 2
+    bn.lid   x20, 0(x10++)
+    bn.sid   x20, 0(x11++)
+
+  /* Subtract 1 from q in-place (no carry from lowest limb since p is odd).
+       dmem[rsa_q..rsa_q+(plen*32)] <= q - 1 */
+  la       x10, rsa_q
+  la       x11, rsa_qm1
+  bn.lid   x20, 0(x10++)
+  bn.subi  w20, w20, 1
+  bn.sid   x20, 0(x11++)
+
+  loop     x31, 2
+    bn.lid   x20, 0(x10++)
+    bn.sid   x20, 0(x11++)
+
+  ret
+
 
 /**
  * Derive the private RSA exponent d.
@@ -96,6 +191,7 @@ rsa_keygen:
  * @param[in]  x20: 20, constant
  * @param[in]  x21: 21, constant
  * @param[in]  x30: plen, number of 256-bit limbs for p and q
+ * @param[in]  x31: plen-1
  * @param[in]  w31: all-zero
  * @param[out] dmem[rsa_d..rsa_d+(plen*2*32)]: result, private exponent d
  *
@@ -103,21 +199,13 @@ rsa_keygen:
  * clobbered flag groups: FG0, FG1
  */
 derive_d:
-  /* Load pointers to p, q, and the result buffer. */
-  la       x10, rsa_p
-  la       x11, rsa_q
+  /* Prepare p - 1 and q - 1 */
+  jal      x1, prepare_pm1qm1 
 
-  /* Subtract 1 from p in-place (no carry from lowest limb since p is odd).
-       dmem[rsa_p..rsa_p+(plen*32)] <= p - 1 */
-  bn.lid   x20, 0(x10)
-  bn.subi  w20, w20, 1
-  bn.sid   x20, 0(x10)
-
-  /* Subtract 1 from q in-place (no carry from lowest limb since p is odd).
-       dmem[rsa_q..rsa_q+(plen*32)] <= q - 1 */
-  bn.lid   x20, 0(x11)
-  bn.subi  w20, w20, 1
-  bn.sid   x20, 0(x11)
+  /* Load pointers to pm1, qm1, and the result buffer. */
+  /* Prepare p - 1 and q - 1 */
+  la       x10, rsa_pm1
+  la       x11, rsa_qm1
 
   /* Compute the LCM of (p-1) and (q-1) and store in the scratchpad.
        dmem[tmp_scratchpad] <= LCM(p-1,q-1) */
@@ -135,11 +223,60 @@ derive_d:
   la       x12, tmp_scratchpad
   la       x13, rsa_d
   la       x14, rsa_cofactor
-  la       x15, rsa_pq
+  la       x15, rsa_d_crt
   jal      x1, modinv_f4
 
   /* Reset the limb count.
        x30 <= (plen*2) >> 1 = n */
+  srli     x30, x30, 1
+  ret
+
+/**
+ * Derive a private RSA exponent CRT component from the private exponent d.
+ *
+ * The supplied value at `dptr_pm1` must be n limbs as a requirement of `div`,
+ * but this function ignores the most significant n/2 limbs, zero-extending the
+ * least significant n/2 limbs to the full buffer.
+ *
+ * @param[in]  x10: dptr_d_p, pointer to buffer to store result in DMEM (n/2 limbs)
+ * @param[in]  x11: dptr_pm1, pointer to (p - 1) to reduce modulo in DMEM (n limbs)
+ * @param[in]  x30: plen, number of 256-bit limbs for p and q
+ * @param[in]  w31: all-zero
+ * @param[out] dmem[dptr_d_p..dptr_d_p+(plen*32)]: result, CRT component d_p
+ *
+ * clobbered registers: x2 to x5, x8, x12, x13, x23 to x25, w20, w23 to w27
+ * clobbered flag groups: FG0
+ */
+derive_crt_component:
+  /* Copy (cofactor - 1) to the start of the scratchpad to zero-extend it. */
+  la       x12, tmp_scratchpad
+  loop     x30, 2
+    bn.lid   x20, 0(x11++)
+    bn.sid   x20, 0(x12++)
+
+  /* Zero out the remainder of the scratchpad to perform the zero-extend. */
+  li       x2, 31
+  loop     x30, 1
+    bn.sid   x2, 0(x12++) 
+
+  /* Update the number of limbs for the copy of d and call to div.
+       x30 <= plen*2 */
+  add      x30, x30, x30
+
+  /* Copy the full value of d to dptr_d_p. */
+  la       x12, rsa_d
+  addi     x13, x10, 0
+  loop     x30, 2
+    bn.lid   x20, 0(x12++)
+    bn.sid   x20, 0(x13++)
+
+  /* Call div to compute the value of d_p. */
+  la       x11, tmp_scratchpad
+  la       x12, rsa_cofactor
+  jal      x1, div
+
+  /* Reset the limb count.
+       x30 <= (plen*2) >> 1 = plen */
   srli     x30, x30, 1
   ret
 
@@ -441,7 +578,7 @@ modinv_f4:
   addi     x31, x31, 17
 
   /* Main loop. */
-  loop     x31, 120
+  loop     x31, 122
     /* Load the least significant limb of v.
          w20 <= dmem[dptr_v] = v[255:0] */
     bn.lid   x20, 0(x15)
@@ -535,10 +672,13 @@ modinv_f4:
       /* FG1.C <= w23 <? m[i] + FG1.C */
       bn.cmpb  w23, w20, FG1
 
-    /* Capture FG1.C as a mask that is all 1s if we should subtract the modulus.
-         w26 <= FG1.C ? 0 : 2^256 - 1 */
+    /* Capture ~FG0.C & FG1.C as a mask that is all 1s if we should subtract
+       the modulus.
+         w26 <= (~FG0.C & FG1.C) ? 0 : 2^256 - 1 */
+    bn.subb  w23, w31, w31, FG0
     bn.subb  w26, w31, w31, FG1
     bn.not   w26, w26
+    bn.or    w26, w23, w26
 
     /* Clear flags for both groups. */
     bn.sub   w31, w31, w31, FG0
@@ -746,6 +886,587 @@ _modinv_f4_u_ok:
   /* Done; the modular inverse is stored in A. */
 
   ret
+
+/**
+ * Compute the inverse of a given value modulo a given number.
+ *
+ * Returns d such that (d*a) = 1 mod m and 0 <= d < m.
+ *
+ * Requires that m is nonzero, and that GCD(a, m) = 1.
+ *
+ * For details on the source and formal verification of the algorithm used, see
+ * the documentation for `modinv_f4`. Note that while `modinv_f4` is specialized
+ * to a = 65537 (the fourth Fermat prime, F4), this algorithm allows for any
+ * n-limb supplied value of a.
+ *
+ * For completeness, the constant-time version of the pseudocode we use is:
+ *   A, C = 1, 0
+ *   u = a
+ *   v = m
+ *   // Loop invariants:
+ *   //   A*x - B*y = u
+ *   //   D*y - C*x = v
+ *   //   gcd(u, v) = gcd(x, y)
+ *   //   bitlen(u) + bitlen(v) <= i
+ *   //   gcd(u, v) = 1
+ *   //   bitlen(u) + bitlen(v) <= i
+ *   //   0 < u <= a
+ *   //   0 <= v <= m
+ *   //   0 <= A, C < m
+ *   //   0 <= B, D < a
+ *   for i=(bitlen(a) + bitlen(m))..1:
+ *     both_odd = u[0] & v[0]
+ *     v_lt_u = v < u
+ *     u = u - ((both_odd && v_lt_u) ? v : 0)
+ *     v = v - ((both_odd && !v_lt_u) ? u : 0)
+ *     ac = (A + C) mod m
+ *     A = (both_odd && v_lt_u) ? ac : A
+ *     C = (both_odd && !v_lt_u) ? ac : C
+ *     bd = (B + D) mod a
+ *     B = (both_odd && v_lt_u) ? bd : B
+ *     D = (both_odd && !v_lt_u) ? bd : D
+ *     u_even = !u[0]
+ *     a_or_b_odd = A[0] | B[0]
+ *     u = u_even ? u >> 1 : u
+ *     A = (u_even && a_or_b_odd) ? (A + m) : A
+ *     A = u_even ? (A >> 1) : A
+ *     B = (u_even && a_or_b_odd) ? (B + a) : B
+ *     B = u_even ? (B >> 1) : B
+ *     v_even = !v[0]
+ *     c_or_d_odd = C[0] | D[0]
+ *     v = v_even ? v >> 1 : v
+ *     C = (v_even && c_or_d_odd) ? (C + m) : C
+ *     C = v_even ? (C >> 1) : C
+ *     D = (u_even && c_or_d_odd) ? (D + a) : D
+ *     D = u_even ? (D >> 1) : D
+ *   if u != 1:
+ *     FAIL("Not invertible")
+ *   return A
+ *
+ * This routine runs in constant time.
+ *
+ * Flags: Flags have no meaning beyond the scope of this subroutine.
+ *
+ * @param[in]  x11: dptr_a, pointer to argument a in DMEM (n limbs)
+ * @param[in]  x12: dptr_m, pointer to modulus m in DMEM (n limbs)
+ * @param[in]  x13: dptr_A, pointer to result buffer in DMEM (n limbs)
+ * @param[in]  x14: dptr_B, pointer to a temporary buffer in DMEM (n limbs)
+ * @param[in]  x15: dptr_C, pointer to a temporary buffer in DMEM (n limbs)
+ * @param[in]  x16: dptr_D, pointer to a temporary buffer in DMEM (n limbs)
+ * @param[in]  x17: dptr_u, pointer to a temporary buffer in DMEM (n limbs)
+ * @param[in]  x18: dptr_v, pointer to a temporary buffer in DMEM (n limbs)
+ * @param[in]  x20: 20, constant
+ * @param[in]  x21: 21, constant
+ * @param[in]  x30: plen, number of 256-bit limbs for modulus m and result d
+ * @param[in]  w31: all-zero
+ * @param[out] dmem[dptr_A..dptr_A+(plen*32)]: result, modular inverse d
+ *
+ * clobbered registers: MOD, x2 to x4, x31, w20 to w28
+ * clobbered flag groups: FG0, FG1
+ */
+
+modinv:
+  /* Zero the intermediate buffers.
+       dmem[dptr_A..dptr_A+(plen*32)] <= 0
+       dmem[dptr_B..dptr_B+(plen*32)] <= 0
+       dmem[dptr_C..dptr_C+(plen*32)] <= 0
+       dmem[dptr_D..dptr_D+(plen*32)] <= 0 */
+  li       x2, 31
+  addi     x3, x13, 0
+  addi     x4, x14, 0
+  addi     x5, x15, 0
+  addi     x6, x16, 0
+  loop     x30, 4
+    bn.sid   x2, 0(x3++)
+    bn.sid   x2, 0(x4++)
+    bn.sid   x2, 0(x5++)
+    bn.sid   x2, 0(x6++)
+
+  /* Set the lowest limb of A to 1.
+       dmem[dptr_A] <= 1 */
+  bn.addi  w20, w31, 1
+  bn.sid   x20, 0(x13)
+
+  /* Set the lowest limb of D to 1.
+       dmem[dptr_D] <= 1 */
+  bn.addi  w20, w31, 1
+  bn.sid   x20, 0(x16)
+ 
+  /* Copy the argument to the buffer for u.
+       dmem[dptr_u..dptr_u+(plen*32)] <= a */
+  addi     x3, x11, 0
+  addi     x4, x17, 0
+  loop     x30, 2
+    bn.lid   x20, 0(x3++)
+    bn.sid   x20, 0(x4++)
+
+  /* Copy the modulus to the buffer for v.
+       dmem[dptr_v..dptr_v+(plen*32)] <= m */
+  addi     x3, x12, 0
+  addi     x4, x18, 0
+  loop     x30, 2
+    bn.lid   x20, 0(x3++)
+    bn.sid   x20, 0(x4++)
+
+  /* Calculate number of loop iterations = bitlen(m) + bitlen(a).
+       x31 <= (x30 << 8) + (x30 << 8) = (x30 << 9) = 512*n */
+  slli     x31, x30, 9
+
+  /* Main loop. */
+  loop     x31, 187
+    /* Load the least significant limb of u.
+         w20 <= dmem[dptr_u] = u[255:0] */
+    bn.lid   x20, 0(x17)
+
+    /* Load the least significant limb of v.
+         w21 <= dmem[dptr_v] = v[255:0] */
+    bn.lid   x21, 0(x18)
+
+    /* Construct a flag that is 1 if both u and v are odd.
+         FG1.L <= (w20 & w21)[0] = u[0] && v[0] */
+    bn.and   w22, w21, w20, FG1
+
+    /* Compare u and v.
+         FG0.C <= v < u */
+    addi       x2, x17, 0
+    addi       x3, x18, 0
+    loop       x30, 3
+      /* w20 <= u[i] */
+      bn.lid   x20, 0(x2++)
+      /* w21 <= v[i] */
+      bn.lid   x21, 0(x3++)
+      /* FG0.C <= v[i] <? u[i] + FG0.C */
+      bn.cmpb  w21, w20
+
+    /* Capture FG0.C in a mask.
+         w23 <= FG0.C ? 2^256 - 1 : 0 */
+    bn.subb  w23, w31, w31
+
+    /* Select a mask that is all 1s if we should subtract v from u.
+         w24 <= FG1.L ? w23 : w31 = (u[0] && v[0] && v < u) ? 2^256 - 1 : 0 */
+    bn.sel   w24, w23, w31, FG1.L
+
+    /* Select a mask that is all 1s if we should subtract u from v.
+         w25 <= FG1.L ? !w23 : w31 = (u[0] && v[0] && u <= v) ? 2^256 - 1 : 0 */
+    bn.not   w23, w23
+    bn.sel   w25, w23, w31, FG1.L
+
+    /* Clear flags for group 0. */
+    bn.sub   w31, w31, w31
+
+    /* Conditionally subtract v from u.
+         dmem[dptr_u..dptr_u+(plen*32)] <= dmem[dptr_u] - (dmem[dptr_v] & w24) */
+    addi     x2, x17, 0
+    addi     x3, x18, 0
+    loop     x30, 5
+      /* w20 <= u[i] */
+      bn.lid   x20, 0(x2)
+      /* w21 <= v[i] */
+      bn.lid   x21, 0(x3++)
+      /* w21 <= v[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= u[i] - (v[i] & w24) - FG0.C */
+      bn.subb  w20, w20, w21
+      /* u[i] <= w20 */
+      bn.sid   x20, 0(x2++)
+
+    /* Conditionally subtract u from v.
+         dmem[dptr_v..dptr_v+(plen*32)] <= dmem[dptr_v] - (dmem[dptr_u] & w25) */
+    addi     x2, x17, 0
+    addi     x3, x18, 0
+    loop     x30, 5
+      /* w20 <= u[i] */
+      bn.lid   x20, 0(x2++)
+      /* w21 <= v[i] */
+      bn.lid   x21, 0(x3)
+      /* w20 <= u[i] & w25 */
+      bn.and   w20, w20, w25
+      /* w21, FG0.C <= v[i] - (u[i] & w25) - FG0.C */
+      bn.subb  w21, w21, w20
+      /* u[i] <= w21 */
+      bn.sid   x21, 0(x3++)
+
+    /* Clear flags for both groups. */
+    bn.sub   w31, w31, w31, FG0
+    bn.sub   w31, w31, w31, FG1
+
+    /* Compare (A + C) to m.
+         FG1.C <= A + C < m */
+    addi     x2, x12, 0
+    addi     x3, x13, 0
+    addi     x4, x15, 0
+    loop     x30, 5
+      /* w20 <= A[i] */
+      bn.lid   x20, 0(x3++)
+      /* w21 <= C[i] */
+      bn.lid   x21, 0(x4++)
+      /* w23, FG0.C <= A[i] + C[i] + FG0.C */
+      bn.addc  w23, w20, w21
+      /* w20 <= m[i] */
+      bn.lid   x20, 0(x2++)
+      /* FG1.C <= w23 <? m[i] + FG1.C */
+      bn.cmpb  w23, w20, FG1
+
+    /* Capture ~FG0.C & FG1.C as a mask that is all 1s if we should subtract
+       the modulus.
+         w26 <= (~FG0.C & FG1.C) ? 0 : 2^256 - 1 */
+    bn.subb  w23, w31, w31, FG0
+    bn.subb  w26, w31, w31, FG1
+    bn.not   w26, w26
+    bn.or    w26, w23, w26
+
+    /* Clear flags for both groups. */
+    bn.sub   w31, w31, w31, FG0
+    bn.sub   w31, w31, w31, FG1
+
+    /* Update A if we updated u in the previous steps (w24 == 2^256-1). We
+       additionally subtract the modulus if *both* w24,w26 == 2^256-1.
+         dmem[dptr_A..dptr_A+(plen*32)] <= (w24 == 2^256-1) ? (A + C) mod m : A */
+    addi     x2, x12, 0
+    addi     x3, x13, 0
+    addi     x4, x15, 0
+    loop     x30, 9
+      /* w20 <= A[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= C[i] */
+      bn.lid   x21, 0(x4++)
+      /* w21 <= C[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= w20 + w21 + FG0.C */
+      bn.addc  w20, w20, w21
+      /* w21 <= m[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= m[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w21 <= m[i] & w24 & w26 */
+      bn.and   w21, w21, w26
+      /* w20, FG1.C <= w20 - w21 - FG1.C  */
+      bn.subb  w20, w20, w21, FG1
+      /* A[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Update C if we updated v in the previous steps (w25 == 2^256-1). We
+       additionally subtract the modulus if *both* w25,w26 == 2^256-1.
+         dmem[dptr_C..dptr_C+(plen*32)] <= (w25 == 2^256-1) ? (A + C) mod m : C */
+    addi     x2, x12, 0
+    addi     x3, x13, 0
+    addi     x4, x15, 0
+    loop     x30, 9
+      /* w20 <= C[i] */
+      bn.lid   x20, 0(x4)
+      /* w21 <= A[i] */
+      bn.lid   x21, 0(x3++)
+      /* w21 <= A[i] & w25 */
+      bn.and   w21, w21, w25
+      /* w20, FG0.C <= w20 + w21 + FG0.C */
+      bn.addc  w20, w20, w21
+      /* w21 <= m[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= m[i] & w25 */
+      bn.and   w21, w21, w25
+      /* w21 <= m[i] & w25 & w26 */
+      bn.and   w21, w21, w26
+      /* w20, FG1.C <= w20 - w21 - FG1.C  */
+      bn.subb  w20, w20, w21, FG1
+      /* C[i] <= w20 */
+      bn.sid   x20, 0(x4++)
+
+    /* Clear flags for both groups. */
+    bn.sub   w31, w31, w31, FG0
+    bn.sub   w31, w31, w31, FG1
+
+    /* Compare (B + D) to a.
+         FG1.C <= B + D < a */
+    addi     x2, x11, 0
+    addi     x3, x14, 0
+    addi     x4, x16, 0
+    loop     x30, 5
+      /* w20 <= B[i] */
+      bn.lid   x20, 0(x3++)
+      /* w21 <= D[i] */
+      bn.lid   x21, 0(x4++)
+      /* w23, FG0.C <= B[i] + D[i] + FG0.C */
+      bn.addc  w23, w20, w21
+      /* w20 <= a[i] */
+      bn.lid   x20, 0(x2++)
+      /* FG1.C <= w23 <? m[i] + FG1.C */
+      bn.cmpb  w23, w20, FG1
+
+    /* Capture ~FG0.C & FG1.C as a mask that is all 1s if we should subtract
+       the modulus.
+         w26 <= (~FG0.C & FG1.C) ? 0 : 2^256 - 1 */
+    bn.subb  w23, w31, w31, FG0
+    bn.subb  w26, w31, w31, FG1
+    bn.not   w26, w26
+    bn.or    w26, w23, w26
+
+    /* Clear flags for both groups. */
+    bn.sub   w31, w31, w31, FG0
+    bn.sub   w31, w31, w31, FG1
+     
+    /* Update B if we updated u in the previous steps (w24 == 2^256-1). We
+       additionally subtract the modulus if *both* w24,w26 == 2^256-1.
+         dmem[dptr_B..dptr_B+(plen*32)] <= (w24 == 2^256-1) ? (B + D) mod a : A */
+    addi     x2, x11, 0
+    addi     x3, x14, 0
+    addi     x4, x16, 0
+    loop     x30, 9
+      /* w20 <= B[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= D[i] */
+      bn.lid   x21, 0(x4++)
+      /* w21 <= D[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= w20 + w21 + FG0.C */
+      bn.addc  w20, w20, w21
+      /* w21 <= a[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= a[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w21 <= a[i] & w24 & w26 */
+      bn.and   w21, w21, w26
+      /* w20, FG1.C <= w20 - w21 - FG1.C  */
+      bn.subb  w20, w20, w21, FG1
+      /* B[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Update D if we updated v in the previous steps (w25 == 2^256-1). We
+       additionally subtract the modulus if *both* w25,w26 == 2^256-1.
+         dmem[dptr_D..dptr_D+(plen*32)] <= (w25 == 2^256-1) ? (A + C) mod m : C */
+    addi     x2, x11, 0
+    addi     x3, x14, 0
+    addi     x4, x16, 0
+    loop     x30, 9
+      /* w20 <= D[i] */
+      bn.lid   x20, 0(x4)
+      /* w21 <= B[i] */
+      bn.lid   x21, 0(x3++)
+      /* w21 <= B[i] & w25 */
+      bn.and   w21, w21, w25
+      /* w20, FG0.C <= w20 + w21 + FG0.C */
+      bn.addc  w20, w20, w21
+      /* w21 <= a[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= a[i] & w25 */
+      bn.and   w21, w21, w25
+      /* w21 <= a[i] & w25 & w26 */
+      bn.and   w21, w21, w26
+      /* w20, FG1.C <= w20 - w21 - FG1.C  */
+      bn.subb  w20, w20, w21, FG1
+      /* C[i] <= w20 */
+      bn.sid   x20, 0(x4++)
+
+    /* Get a flag that is set if u is odd.
+         FG1.L <= u[0] */
+    bn.lid   x20, 0(x17)
+    bn.or    w20, w20, w31, FG1
+
+    /* Shift u to the right 1 if FG1.L is unset.
+         dmem[dptr_u..dptr_u+(plen*32)] <= FG1.L ? u : u >> 1 */
+    addi     x3, x17, 0
+    bn.mov   w23, w31
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* Create an all-ones mask.
+         w23 <= 2^256 - 1 */
+    bn.not   w24, w31
+
+    /* Get a flag that is set if A or B is odd.
+         FG0.L <= A[0] | B[0] */
+    bn.lid   x20, 0(x13)
+    bn.lid   x21, 0(x14)
+    bn.or    w20, w20, w21
+
+    /* Select a mask for adding moduli to A and B (should do this if u is even
+       and at least one of A and B is odd).
+         w23 <= (!FG1.L && FG0.L) ? 2^256 - 1 : 0 */
+    bn.sel   w24, w31, w24, FG1.L
+    bn.sel   w24, w24, w31, FG0.L
+
+    /* Clear flags for group 0. */
+    bn.sub   w31, w31, w31
+
+    /* Conditionally add m to A.
+         dmem[dptr_A..dptr_A+(plen*32)] <= (!u[0] && (A[0] | B[0])) ? A + m : A */
+    addi     x2, x12, 0
+    addi     x3, x13, 0
+    loop     x30, 5
+      /* w20 <= A[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= m[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= m[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= A[i] + (m[i] & w23) + FG0.C */
+      bn.addc  w20, w20, w21
+      /* A[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Capture the final carry bit in a register to use as the MSB for the
+       shift. */
+    bn.addc  w23, w31, w31
+
+    /* Shift A to the right 1 if FG1.L is unset.
+         dmem[dptr_A..dptr_A+(plen*32)] <= FG1.L ? A : A >> 1 */
+    addi     x3, x13, 0
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* Clear flags for group 0. */
+    bn.sub   w31, w31, w31
+
+    /* Conditionally add a to B.
+         dmem[dptr_B..dptr_B+(plen*32)] <= (!u[0] && (A[0] | B[0])) ? B + a : B */
+    addi     x2, x11, 0
+    addi     x3, x14, 0
+    loop     x30, 5
+      /* w20 <= B[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= a[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= a[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= B[i] + (a[i] & w23) + FG0.C */
+      bn.addc  w20, w20, w21
+      /* B[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Capture the final carry bit in a register to use as the MSB for the
+       shift. */
+    bn.addc  w23, w31, w31
+
+    /* Shift B to the right 1 if FG1.L is unset.
+         dmem[dptr_B..dptr_B+(plen*32)] <= FG1.L ? B : B >> 1 */
+    addi     x3, x14, 0
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* Get a flag that is set if v is odd.
+         FG1.L <= v[0] */
+    bn.lid   x20, 0(x18)
+    bn.or    w20, w20, w31, FG1
+
+    /* Shift v to the right 1 if FG1.L is unset.
+         dmem[dptr_v..dptr_v+(plen*32)] <= FG1.L ? v : v >> 1 */
+    addi     x3, x18, 0
+    bn.mov   w23, w31
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* Create an all-ones mask.
+         w23 <= 2^256 - 1 */
+    bn.not   w24, w31
+
+    /* Get a flag that is set if C or D is odd.
+         FG0.L <= C[0] | D[0] */
+    bn.lid   x20, 0(x15)
+    bn.lid   x21, 0(x16)
+    bn.or    w20, w20, w21
+
+    /* Select a mask for adding moduli to C and D (should do this if v is even
+       and at least one of C and D is odd).
+         w23 <= (!FG1.L && FG0.L) ? 2^256 - 1 : 0 */
+    bn.sel   w24, w31, w24, FG1.L
+    bn.sel   w24, w24, w31, FG0.L
+
+    /* Clear flags for group 0. */
+    bn.sub   w31, w31, w31
+
+    /* Conditionally add m to C.
+         dmem[dptr_C..dptr_C+(plen*32)] <= (!v[0] && (C[0] | D[0])) ? C + m : C */
+    addi     x2, x12, 0
+    addi     x3, x15, 0
+    loop     x30, 5
+      /* w20 <= C[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= m[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= m[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= C[i] + (m[i] & w23) + FG0.C */
+      bn.addc  w20, w20, w21
+      /* C[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Capture the final carry bit in a register to use as the MSB for the
+       shift. */
+    bn.addc  w23, w31, w31
+
+    /* Shift C to the right 1 if FG1.L is unset.
+         dmem[dptr_C..dptr_C+(plen*32)] <= FG1.L ? C : C >> 1 */
+    addi     x3, x15, 0
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* Clear flags for group 0. */
+    bn.sub   w31, w31, w31
+
+    /* Conditionally add a to D.
+         dmem[dptr_A..dptr_A+(plen*32)] <= (!u[0] && (A[0] | B[0])) ? A + m : A */
+    addi     x2, x11, 0
+    addi     x3, x16, 0
+    loop     x30, 5
+      /* w20 <= A[i] */
+      bn.lid   x20, 0(x3)
+      /* w21 <= m[i] */
+      bn.lid   x21, 0(x2++)
+      /* w21 <= m[i] & w24 */
+      bn.and   w21, w21, w24
+      /* w20, FG0.C <= A[i] + (m[i] & w23) + FG0.C */
+      bn.addc  w20, w20, w21
+      /* A[i] <= w20 */
+      bn.sid   x20, 0(x3++)
+
+    /* Capture the final carry bit in a register to use as the MSB for the
+       shift. */
+    bn.addc  w23, w31, w31
+
+    /* Shift D to the right 1 if FG1.L is unset.
+         dmem[dptr_A..dptr_A+(plen*32)] <= FG1.L ? A : A >> 1 */
+    addi     x3, x16, 0
+    jal      x1, bignum_rshift1_if_not_fg1L
+
+    /* End of loop; no-op so we don't end on a jump. */
+    nop
+
+  /* FG0.Z <= u[0] == 1 */
+  bn.addi  w23, w31, 1
+  bn.lid   x20, 0(x17++)
+  bn.cmp   w20, w23
+
+  /* Get the FG0.Z flag into a register.
+       x2 <= CSRs[FG0] & 8 = FG0.Z << 3 */
+  csrrs    x2, FG0, x0
+  andi     x2, x2, 8
+
+  /* If the flag is unset (x2 == 0) then we already know u != 1; in this
+     case GCD(65537, m) != 1 and the modular inverse cannot be computed. This
+     should never happen under normal operation, so panic and abort the program
+     immediately. */
+  bne      x2, x0, _modinv_u_low_ok
+  unimp
+
+_modinv_u_low_ok:
+  /* x31 <= plen - 1
+     FG0.Z <= (u[1] | ... | u[plen - 1] == 0) */
+  bn.mov   w23, w31
+  addi     x2, x0, 1
+  sub      x31, x30, x2
+  loop     x31, 2
+    bn.lid   x20, 0(x17++)
+    bn.or    w23, w20, w23 
+
+  /* Get the FG0.Z flag into a register.
+       x2 <= CSRs[FG0] & 8 = FG0.Z << 3 */
+  csrrs    x2, FG0, x0
+  andi     x2, x2, 8
+
+  /* If the flag is unset (x2 == 0) then we know u != 1; in this case GCD(65537,
+     m) != 1 and the modular inverse cannot be computed. This should never
+     happen under normal operation, so panic and abort the program immediately. */
+  bne      x2, x0, _modinv_u_ok
+  unimp
+
+_modinv_u_ok:
+  /* Done; the modular inverse is stored in A. */
+  ret
+  
 
 /**
  * Shifts input 1 bit to the right in-place if FG1.L is 0.
@@ -1712,10 +2433,30 @@ is_zero_mod_small_prime:
 
 .section .scratchpad
 
-/* Extra label marking the start of p || q in memory. The `derive_d` function
-   uses this to get a 512-byte working buffer, which means p and q must be
-   continuous in memory. In addition, `rsa_key_from_cofactor` uses the
-   larger buffer for division and depends on the order of `p` and `q`. */
+/* RSA private exponent d. Up to 4096 bits; also used as a temporary work buffer
+  containing `mont_m0inv` and `mont_rr`. */
+.balign 32
+rsa_d:
+
+/* Montgomery constant m0' (256 bits). */
+.balign 32
+mont_m0inv:
+.zero 256
+
+/* Montgomery constant R^2 (up to 2048 bits). */
+.balign 32
+mont_rr:
+.zero 256
+
+/* Temporary working buffer (4096 bits). */
+.balign 32
+tmp_scratchpad:
+.zero 512
+
+.bss
+
+/* Secret RSA cofactors; also used as a temporary work buffer containing `rsa_p`
+   and `rsa_q`. */
 .balign 32
 rsa_pq:
 
@@ -1729,38 +2470,53 @@ rsa_p:
 rsa_q:
 .zero 256
 
-/* Temporary working buffer (4096 bits). */
-.balign 32
-tmp_scratchpad:
-.zero 512
-
-.bss
-
 /* RSA modulus n = p*q (up to 4096 bits). */
 .balign 32
 .globl rsa_n
 rsa_n:
 .zero 512
 
-/* RSA private exponent d (up to 4096 bits). */
+/* RSA private exponent CRT components; also used as a temporary work buffer
+   containing `rsa_d_p` and `rsa_d_q`. */
 .balign 32
-.globl rsa_d
-rsa_d:
-.zero 512
+rsa_d_crt:
+
+/* RSA private exponent CRT component d_p = d mod (p - 1) (up to 2048 bits). */
+.balign 32
+.globl rsa_d_p
+rsa_d_p:
+.zero 256
+
+/* RSA private exponent CRT component d_q = d mod (q - 1) (up to 2048 bits). */
+.balign 32
+.globl rsa_d_q
+rsa_d_q:
+.zero 256
+
+/* RSA private CRT coefficient i_q = q^(-1) mod p (up to 2048 bits). */
+.balign 32
+.globl rsa_i_q
+rsa_i_q:
+.zero 256
 
 /* Prime cofactor for n for `rsa_key_from_cofactor`; also used as a temporary
- * work buffer. */
+ * work buffer containing `rsa_pm1` and `rsa_pm2`. */
 .balign 32
 .globl rsa_cofactor
 rsa_cofactor:
-.zero 512
 
-/* Montgomery constant m0' (256 bits). */
+/* Temporary work buffer inside `rsa_cofactor` for holding RSA `p` parameter
+   (prime) minus one. Up to 2048 bits; intermediate value used to derive CRT
+   coefficients. */
 .balign 32
-mont_m0inv:
-.zero 32
+.globl rsa_pm1
+rsa_pm1:
+.zero 256
 
-/* Montgomery constant R^2 (up to 2048 bits). */
+/* Temporary work buffer inside `rsa_cofactor` for holding RSA `q` parameter
+   (prime) minus one. Up to 2048 bits; intermediate value used to derive CRT
+   coefficients. */
 .balign 32
-mont_rr:
+.globl rsa_qm1
+rsa_qm1:
 .zero 256

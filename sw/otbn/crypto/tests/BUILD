@@ -933,6 +933,23 @@ otbn_sim_test(
     ],
 )
 
+otbn_sim_test(
+    name = "modinv_test",
+    srcs = [
+        "modinv_test.s",
+    ],
+    exp = "modinv_test.exp",
+    deps = [
+        "//sw/otbn/crypto:div",
+        "//sw/otbn/crypto:gcd",
+        "//sw/otbn/crypto:lcm",
+        "//sw/otbn/crypto:montmul",
+        "//sw/otbn/crypto:mul",
+        "//sw/otbn/crypto:primality",
+        "//sw/otbn/crypto:rsa_keygen",
+    ],
+)
+
 otbn_consttime_test(
     name = "modinv_f4_consttime_test",
     initial_constants = [
