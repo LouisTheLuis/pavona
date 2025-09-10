@@ -116,7 +116,7 @@ p256_sign:
   la        x22, y
   bn.sid    x2, 0(x22)
 
-  /* Compute both sides of the Weierstrauss equation.
+  /* Compute both sides of the Weierstrass equation.
        w18 <= (x^3 + ax + b) mod p
        w19 <= (y^2) mod p */
   jal      x1, p256_isoncurve

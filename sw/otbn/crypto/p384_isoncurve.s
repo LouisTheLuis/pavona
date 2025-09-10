@@ -210,7 +210,7 @@ p384_check_public_key:
   la        x22, rhs
   la        x23, lhs
 
-  /* Compute both sides of the Weierstrauss equation.
+  /* Compute both sides of the Weierstrass equation.
        dmem[rhs] <= (x^3 + ax + b) mod p
        dmem[lhs] <= (y^2) mod p */
   jal       x1, p384_isoncurve

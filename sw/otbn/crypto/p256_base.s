@@ -89,7 +89,7 @@ trigger_fault_if_fg0_z:
  * the flag's value is likely clearly visible to an attacker through timing.
  *
  * @param[in]    w31: all-zero
- * @param[in]  FG0.Z: boolean indicating fault condition
+ * @param[in]  FG0.Z: boolean indicating (complement of) fault condition
  *
  * clobbered registers: x2
  * clobbered flag groups: none
@@ -99,11 +99,15 @@ trigger_fault_if_fg0_not_z:
        x2 <= FG0.Z */
   csrrw     x2, FG0, x0
   andi      x2, x2, 8
-  slli      x2, x2, 3
+  srli      x2, x2, 3
+
+  /* Subtract 1 from FG0.Z.
+       x2 <= x2 - 1 = FG0.Z ? 0 : 2^32 - 1 */
+  addi      x2, x2, -1
 
   /* The `bn.lid` instruction causes an `BAD_DATA_ADDR` error if the
-     memory address is out of bounds. Therefore, if FG0.Z is 1, this
-     instruction causes an error, but if FG0.Z is 0 it simply loads the word at
+     memory address is out of bounds. Therefore, if FG0.Z is 0, this
+     instruction causes an error, but if FG0.Z is 1 it simply loads the word at
      address 0 into w31. */
   li         x3, 31
   bn.lid     x3, 0(x2)
@@ -1550,7 +1554,7 @@ p256_base_mult:
   la        x22, y
   bn.sid    x2, 0(x22)
 
-  /* Compute both sides of the Weierstrauss equation.
+  /* Compute both sides of the Weierstrass equation.
        w18 <= (x^3 + ax + b) mod p
        w19 <= (y^2) mod p */
   jal      x1, p256_isoncurve

@@ -84,7 +84,7 @@ p256_isoncurve:
   bn.addm   w18, w19, w27
 
   /* Load affine y-coordinate of curve point from dmem
-     w26 <= dmem[y] */
+     w24 <= dmem[y] */
   la        x3, y
   li        x2, 24
   bn.lid    x2, 0(x3)
@@ -164,7 +164,7 @@ p256_check_public_key:
 
   _y_valid:
 
-  /* Compute both sides of the Weierstrauss equation.
+  /* Compute both sides of the Weierstrass equation.
        w18 <= (x^3 + ax + b) mod p
        w19 <= (y^2) mod p */
   jal      x1, p256_isoncurve
