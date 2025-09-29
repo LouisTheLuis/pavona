@@ -76,9 +76,9 @@ enum {
    * to change. This is the length that the caller should set in
    * `keyblob_length` and allocate for the `keyblob` buffer in blinded keys.
    */
-  kOtcryptoRsa2048PrivateKeyblobBytes = 1152,
-  kOtcryptoRsa3072PrivateKeyblobBytes = 1728,
-  kOtcryptoRsa4096PrivateKeyblobBytes = 2304,
+  kOtcryptoRsa2048PrivateKeyblobBytes = 640,
+  kOtcryptoRsa3072PrivateKeyblobBytes = 960,
+  kOtcryptoRsa4096PrivateKeyblobBytes = 1280,
 };
 
 /**
@@ -137,9 +137,10 @@ otcrypto_status_t otcrypto_rsa_public_key_construct(
  * @return Result of the RSA key construction.
  */
 otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
-    otcrypto_rsa_size_t size, otcrypto_const_word32_buf_t modulus, uint32_t e,
-    otcrypto_const_word32_buf_t d_share0, otcrypto_const_word32_buf_t d_share1,
-    otcrypto_blinded_key_t *private_key);
+    otcrypto_rsa_size_t size, otcrypto_const_word32_buf_t modulus,
+    otcrypto_const_word32_buf_t p, otcrypto_const_word32_buf_t q, uint32_t e,
+    otcrypto_const_word32_buf_t d_p, otcrypto_const_word32_buf_t d_q,
+    otcrypto_const_word32_buf_t i_q, otcrypto_blinded_key_t *private_key);
 
 /**
  * Constructs an RSA keypair from the public key and one prime cofactor.

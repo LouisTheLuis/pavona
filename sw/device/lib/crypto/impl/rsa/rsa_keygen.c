@@ -99,8 +99,7 @@ static status_t keygen_start(uint32_t mode) {
  */
 static status_t keygen_finalize(uint32_t exp_mode, size_t num_words,
                                 uint32_t *n, uint32_t *p, uint32_t *q,
-                                uint32_t *d, uint32_t *d_p, uint32_t *d_q,
-                                uint32_t *i_q) {
+                                uint32_t *d_p, uint32_t *d_q, uint32_t *i_q) {
   // Spin here waiting for OTBN to complete.
   OTBN_WIPE_IF_ERROR(otbn_busy_wait_for_done());
 
@@ -139,14 +138,10 @@ status_t rsa_keygen_2048_start(void) {
 
 status_t rsa_keygen_2048_finalize(rsa_2048_public_key_t *public_key,
                                   rsa_2048_private_key_t *private_key) {
-  HARDENED_TRY(keygen_finalize(
-      kOtbnRsaModeGen2048, kRsa2048NumWords, private_key->n.data,
-      private_key->p.data, private_key->q.data, private_key->d.data,
-      private_key->d_p.data, private_key->d_q.data, private_key->i_q.data));
-
-  // Copy the modulus to the public key.
-  hardened_memcpy(public_key->n.data, private_key->n.data,
-                  ARRAYSIZE(private_key->n.data));
+  HARDENED_TRY(keygen_finalize(kOtbnRsaModeGen2048, kRsa2048NumWords,
+                               public_key->n.data, private_key->p.data,
+                               private_key->q.data, private_key->d_p.data,
+                               private_key->d_q.data, private_key->i_q.data));
 
   // Set the public exponent to F4, the only exponent our key generation
   // algorithm supports.
@@ -161,14 +156,10 @@ status_t rsa_keygen_3072_start(void) {
 
 status_t rsa_keygen_3072_finalize(rsa_3072_public_key_t *public_key,
                                   rsa_3072_private_key_t *private_key) {
-  HARDENED_TRY(keygen_finalize(
-      kOtbnRsaModeGen3072, kRsa3072NumWords, private_key->n.data,
-      private_key->p.data, private_key->q.data, private_key->d.data,
-      private_key->d_p.data, private_key->d_q.data, private_key->i_q.data));
-
-  // Copy the modulus to the public key.
-  hardened_memcpy(public_key->n.data, private_key->n.data,
-                  ARRAYSIZE(private_key->n.data));
+  HARDENED_TRY(keygen_finalize(kOtbnRsaModeGen3072, kRsa3072NumWords,
+                               public_key->n.data, private_key->p.data,
+                               private_key->q.data, private_key->d_p.data,
+                               private_key->d_q.data, private_key->i_q.data));
 
   // Set the public exponent to F4, the only exponent our key generation
   // algorithm supports.
@@ -183,14 +174,10 @@ status_t rsa_keygen_4096_start(void) {
 
 status_t rsa_keygen_4096_finalize(rsa_4096_public_key_t *public_key,
                                   rsa_4096_private_key_t *private_key) {
-  HARDENED_TRY(keygen_finalize(
-      kOtbnRsaModeGen4096, kRsa4096NumWords, private_key->n.data,
-      private_key->p.data, private_key->q.data, private_key->d.data,
-      private_key->d_p.data, private_key->d_q.data, private_key->i_q.data));
-
-  // Copy the modulus to the public key.
-  hardened_memcpy(public_key->n.data, private_key->n.data,
-                  ARRAYSIZE(private_key->n.data));
+  HARDENED_TRY(keygen_finalize(kOtbnRsaModeGen4096, kRsa4096NumWords,
+                               public_key->n.data, private_key->p.data,
+                               private_key->q.data, private_key->d_p.data,
+                               private_key->d_q.data, private_key->i_q.data));
 
   // Set the public exponent to F4, the only exponent our key generation
   // algorithm supports.
@@ -223,14 +210,10 @@ status_t rsa_keygen_from_cofactor_2048_start(
 
 status_t rsa_keygen_from_cofactor_2048_finalize(
     rsa_2048_public_key_t *public_key, rsa_2048_private_key_t *private_key) {
-  HARDENED_TRY(keygen_finalize(
-      kOtbnRsaModeCofactor2048, kRsa2048NumWords, private_key->n.data,
-      private_key->p.data, private_key->q.data, private_key->d.data,
-      private_key->d_p.data, private_key->d_q.data, private_key->i_q.data));
-
-  // Copy the modulus to the public key.
-  hardened_memcpy(public_key->n.data, private_key->n.data,
-                  ARRAYSIZE(private_key->n.data));
+  HARDENED_TRY(keygen_finalize(kOtbnRsaModeCofactor2048, kRsa2048NumWords,
+                               public_key->n.data, private_key->p.data,
+                               private_key->q.data, private_key->d_p.data,
+                               private_key->d_q.data, private_key->i_q.data));
 
   // Set the public exponent to F4, the only exponent our key generation
   // algorithm supports.

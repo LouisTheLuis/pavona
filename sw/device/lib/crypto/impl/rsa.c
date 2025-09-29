@@ -179,11 +179,12 @@ static status_t private_key_structural_check(
 }
 
 otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
-    otcrypto_rsa_size_t size, otcrypto_const_word32_buf_t modulus, uint32_t e,
-    otcrypto_const_word32_buf_t d_share0, otcrypto_const_word32_buf_t d_share1,
-    otcrypto_blinded_key_t *private_key) {
-  if (modulus.data == NULL || d_share0.data == NULL || d_share1.data == NULL ||
-      private_key == NULL || private_key->keyblob == NULL) {
+    otcrypto_rsa_size_t size, otcrypto_const_word32_buf_t modulus,
+    otcrypto_const_word32_buf_t p, otcrypto_const_word32_buf_t q, uint32_t e,
+    otcrypto_const_word32_buf_t d_p, otcrypto_const_word32_buf_t d_q,
+    otcrypto_const_word32_buf_t i_q, otcrypto_blinded_key_t *private_key) {
+  if (p.data == NULL || q.data == NULL || d_p.data == NULL ||
+      d_q.data == NULL || private_key == NULL || private_key->keyblob == NULL) {
     return OTCRYPTO_BAD_ARGS;
   }
   // Entropy complex must be initialized for `hardened_memcpy`.
@@ -193,7 +194,8 @@ otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
 
   // Ensure that the length of the private exponent shares matches the length
   // of the modulus.
-  if (d_share0.len != modulus.len || d_share1.len != modulus.len) {
+  if (p.len != modulus.len / 2 || q.len != modulus.len / 2 ||
+      d_p.len != p.len || d_q.len != q.len) {
     return OTCRYPTO_BAD_ARGS;
   }
 
@@ -218,12 +220,11 @@ otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
       }
       rsa_2048_private_key_t *sk =
           (rsa_2048_private_key_t *)private_key->keyblob;
-      hardened_memcpy(sk->n.data, modulus.data, modulus.len);
-      hardened_memcpy(sk->d.data, d_share0.data, d_share0.len);
-      // TODO: RSA keys are currently unblinded, so combine the shares.
-      for (size_t i = 0; i < d_share1.len; i++) {
-        sk->d.data[i] ^= d_share1.data[i];
-      }
+      hardened_memcpy(sk->p.data, p.data, p.len);
+      hardened_memcpy(sk->q.data, q.data, q.len);
+      hardened_memcpy(sk->d_p.data, d_p.data, d_p.len);
+      hardened_memcpy(sk->d_q.data, d_q.data, d_q.len);
+      hardened_memcpy(sk->i_q.data, i_q.data, i_q.len);
       break;
     }
     case kOtcryptoRsaSize3072: {
@@ -233,12 +234,11 @@ otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
       }
       rsa_3072_private_key_t *sk =
           (rsa_3072_private_key_t *)private_key->keyblob;
-      hardened_memcpy(sk->n.data, modulus.data, modulus.len);
-      hardened_memcpy(sk->d.data, d_share0.data, d_share0.len);
-      // TODO: RSA keys are currently unblinded, so combine the shares.
-      for (size_t i = 0; i < d_share1.len; i++) {
-        sk->d.data[i] ^= d_share1.data[i];
-      }
+      hardened_memcpy(sk->p.data, p.data, p.len);
+      hardened_memcpy(sk->q.data, q.data, q.len);
+      hardened_memcpy(sk->d_p.data, d_p.data, d_p.len);
+      hardened_memcpy(sk->d_q.data, d_q.data, d_q.len);
+      hardened_memcpy(sk->i_q.data, i_q.data, i_q.len);
       break;
     }
     case kOtcryptoRsaSize4096: {
@@ -248,12 +248,11 @@ otcrypto_status_t otcrypto_rsa_private_key_from_exponents(
       }
       rsa_4096_private_key_t *sk =
           (rsa_4096_private_key_t *)private_key->keyblob;
-      hardened_memcpy(sk->n.data, modulus.data, modulus.len);
-      hardened_memcpy(sk->d.data, d_share0.data, d_share0.len);
-      // TODO: RSA keys are currently unblinded, so combine the shares.
-      for (size_t i = 0; i < d_share1.len; i++) {
-        sk->d.data[i] ^= d_share1.data[i];
-      }
+      hardened_memcpy(sk->p.data, p.data, p.len);
+      hardened_memcpy(sk->q.data, q.data, q.len);
+      hardened_memcpy(sk->d_p.data, d_p.data, d_p.len);
+      hardened_memcpy(sk->d_q.data, d_q.data, d_q.len);
+      hardened_memcpy(sk->i_q.data, i_q.data, i_q.len);
       break;
     }
     default:

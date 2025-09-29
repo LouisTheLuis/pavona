@@ -142,12 +142,10 @@ typedef struct rsa_4096_short_t {
  * inverse of q mod p.
  */
 typedef struct rsa_2048_private_key_t {
-  rsa_2048_int_t d;
-  rsa_2048_int_t n;
-  rsa_2048_short_t d_p;
-  rsa_2048_short_t d_q;
   rsa_2048_short_t p;
   rsa_2048_short_t q;
+  rsa_2048_short_t d_p;
+  rsa_2048_short_t d_q;
   rsa_2048_short_t i_q;
 } rsa_2048_private_key_t;
 
@@ -160,12 +158,10 @@ typedef struct rsa_2048_private_key_t {
  * inverse of q mod p.
  */
 typedef struct rsa_3072_private_key_t {
-  rsa_3072_int_t d;
-  rsa_3072_int_t n;
-  rsa_3072_short_t d_p;
-  rsa_3072_short_t d_q;
   rsa_3072_short_t p;
   rsa_3072_short_t q;
+  rsa_3072_short_t d_p;
+  rsa_3072_short_t d_q;
   rsa_3072_short_t i_q;
 } rsa_3072_private_key_t;
 
@@ -178,12 +174,10 @@ typedef struct rsa_3072_private_key_t {
  * inverse of q mod p.
  */
 typedef struct rsa_4096_private_key_t {
-  rsa_4096_int_t d;
-  rsa_4096_int_t n;
-  rsa_4096_short_t d_p;
-  rsa_4096_short_t d_q;
   rsa_4096_short_t p;
   rsa_4096_short_t q;
+  rsa_4096_short_t d_p;
+  rsa_4096_short_t d_q;
   rsa_4096_short_t i_q;
 } rsa_4096_private_key_t;
 

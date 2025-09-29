@@ -71,13 +71,6 @@ rsa_keygen:
        dmem[rsa_q..rsa_q+(plen*32)] <= q */
   jal      x1, generate_q
 
-  /* Multiply p and q to get the public modulus n.
-       dmem[rsa_n..rsa_n+(plen*2*32)] <= p * q */
-  la       x10, rsa_p
-  la       x11, rsa_q
-  la       x12, rsa_n
-  jal      x1, bignum_mul
-
   /* Derive the private exponent d from p and q.
        x2 <= zero if d is OK, otherwise nonzero 
        dmem[rsa_p..rsa_p+(plen*32)] <= p - 1. 
@@ -123,7 +116,15 @@ rsa_keygen:
   la       x16, mont_m0inv
   la       x17, mont_rr
   la       x18, tmp_scratchpad
-  jal      x0, modinv
+  jal      x1, modinv
+
+  /* Multiply p and q to get the public modulus n.
+       dmem[rsa_n..rsa_n+(plen*2*32)] <= p * q */
+  la       x10, rsa_p
+  la       x11, rsa_q
+  la       x12, rsa_n
+  jal      x0, bignum_mul
+
 
 
 /**
@@ -272,7 +273,7 @@ derive_crt_component:
 
   /* Call div to compute the value of d_p. */
   la       x11, tmp_scratchpad
-  la       x12, rsa_cofactor
+  la       x12, rsa_n
   jal      x1, div
 
   /* Reset the limb count.

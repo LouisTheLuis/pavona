@@ -1,3 +1,7 @@
+// Copyright zeroRISC Inc.
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright lowRISC contributors (OpenTitan project).
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
@@ -64,24 +68,9 @@ status_t keygen_then_sign_test(void) {
 
   // Interpret private key using internal RSA datatype.
   TRY_CHECK(private_key.keyblob_length == sizeof(rsa_4096_private_key_t));
-  rsa_4096_private_key_t *sk = (rsa_4096_private_key_t *)private_key.keyblob;
 
   // Check that the key uses the F4 exponent.
   TRY_CHECK(pk->e == 65537);
-
-  // Check that the moduli match.
-  TRY_CHECK(ARRAYSIZE(pk->n.data) == ARRAYSIZE(sk->n.data));
-  TRY_CHECK_ARRAYS_EQ(pk->n.data, sk->n.data, ARRAYSIZE(pk->n.data));
-
-  // Check that d is at least 2^(len(n) / 2) (this is a FIPS requirement) by
-  // ensuring that the most significant half is nonzero.
-  bool d_large_enough = false;
-  for (size_t i = kRsa4096NumWords / 2; i < kRsa4096NumWords; i++) {
-    if (sk->d.data[i] != 0) {
-      d_large_enough = true;
-    }
-  }
-  TRY_CHECK(d_large_enough);
 
   // Hash the message.
   otcrypto_const_byte_buf_t msg_buf = {

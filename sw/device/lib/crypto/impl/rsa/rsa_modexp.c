@@ -88,11 +88,14 @@ status_t rsa_modexp_wait(size_t *num_words) {
   HARDENED_TRY(otbn_dmem_read(1, kOtbnVarRsaMode, &mode));
 
   *num_words = 0;
-  if (mode == kMode2048Modexp || mode == kMode2048ModexpF4) {
+  if (mode == kMode2048Modexp || mode == kMode2048ModexpCrt ||
+      mode == kMode2048ModexpF4) {
     *num_words = kRsa2048NumWords;
-  } else if (mode == kMode3072Modexp || mode == kMode3072ModexpF4) {
+  } else if (mode == kMode3072Modexp || mode == kMode3072ModexpCrt ||
+             mode == kMode3072ModexpF4) {
     *num_words = kRsa3072NumWords;
-  } else if (mode == kMode4096Modexp || mode == kMode4096ModexpF4) {
+  } else if (mode == kMode4096Modexp || mode == kMode4096ModexpCrt ||
+             mode == kMode4096ModexpF4) {
     *num_words = kRsa4096NumWords;
   } else {
     // Wipe DMEM.

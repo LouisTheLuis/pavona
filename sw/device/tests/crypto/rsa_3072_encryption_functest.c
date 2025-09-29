@@ -1,3 +1,7 @@
+// Copyright zeroRISC Inc.
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright lowRISC contributors (OpenTitan project).
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
@@ -49,24 +53,62 @@ static uint32_t kTestModulus[kRsa3072NumWords] = {
     0xa4b442f1, 0x8adb26e8, 0xe827fc8c, 0xc6057b0b, 0x1c9f5a53, 0x833bf326,
     0x7520180f, 0x24ec935f, 0xa90cc23b, 0xafe74287, 0x31261907, 0xa60f30a2,
 };
-static uint32_t kTestPrivateExponent[kRsa3072NumWords] = {
-    0xf3cc45d9, 0x8341feca, 0x919be340, 0xf1624a49, 0x8702a398, 0xb332bc60,
-    0xbf748b23, 0xc52df173, 0x25b096ec, 0x8a71c552, 0x1c7f4bd8, 0x7863c805,
-    0x1f44a192, 0x421f557a, 0xc0944ac3, 0x1753730b, 0x44688498, 0x15dae580,
-    0x3c7a23fa, 0xfe49e5b6, 0x15ce0940, 0x04a3767a, 0x5ce77382, 0xf8a09cd5,
-    0x7fc735a1, 0xde3d3702, 0xe8f2bd3b, 0xf7a1e86a, 0xa7bd0a88, 0x52fc2a22,
-    0x621c40e7, 0x2a95830d, 0x098a4e15, 0x374bb038, 0x26066b83, 0xb8d11858,
-    0xc27647b3, 0xcdb00270, 0x42b3cba4, 0x6f433451, 0xa8133125, 0x5efe857e,
-    0x483a0ef6, 0x3e812025, 0x3c4dcc1e, 0xf8f5486c, 0x5e73b4c9, 0x546a4e70,
-    0xa5e8d6fc, 0xf1bee362, 0x3ad9ea8c, 0x4029e0b8, 0xb1457a1b, 0x74deb3c1,
-    0xd929e23c, 0x10c31fa1, 0x65072772, 0xcb95724f, 0x7af4d123, 0x824db164,
-    0x206695e4, 0x742886cd, 0x884979bc, 0x93e6b99f, 0xfc700b23, 0xbfcc1f26,
-    0xbe115398, 0x1bedb018, 0x33e873c8, 0x8e4583b9, 0x666f2c03, 0x280ede59,
-    0x6a76acdc, 0xb2cd4058, 0xa25ce17f, 0xc24789ff, 0xd69f0f98, 0xee4622f0,
-    0x6cb3bd85, 0xb8d5ccb1, 0xcdb605eb, 0x4de47a43, 0x7bda0c86, 0x8b83c71e,
-    0x31837e6a, 0xb02d0228, 0x9be7eb6e, 0xe1746942, 0xb6b48e76, 0xbf8c79d3,
-    0xd81b2383, 0x9e277621, 0x8c4ca670, 0xcfa2b928, 0xd60f0279, 0x2e1fdefe,
+
+static uint32_t kTestCofactorP[kRsa3072NumWords / 2] = {
+    0x2dcdaa29, 0xa5479f83, 0xf0865f20, 0xa00e6b5c, 0xda2f3b0b, 0xe25ee188,
+    0xda871b22, 0x7f3c5312, 0x70d3dbb9, 0x18b5d5c4, 0x6aab200b, 0x4e0f3f82,
+    0xf8a21a59, 0x50ef0295, 0x46e46aab, 0x7d2400cd, 0x7eba5cd,  0x663c5c3e,
+    0x9864429f, 0x43b5f720, 0x44c7bce9, 0xd1b4e7a6, 0x182fad9f, 0xa44f60d1,
+    0x9fbaa2fc, 0xaec05186, 0x5a153b8d, 0x260d7233, 0xf1ca731,  0x3a732dc0,
+    0xb8569f49, 0xff65af8b, 0xe7e52e22, 0x89488e07, 0x48d1fb75, 0xa25d2fc9,
+    0xd7cc292f, 0xb03ed86e, 0xade0e9e8, 0xc2c7d9a6, 0x3669559e, 0x5e42d96e,
+    0xe88cc13f, 0x6e0f4140, 0xbb1d7819, 0xa51aeef0, 0xde49201f, 0xcd8321b3,
 };
+
+static uint32_t kTestCofactorQ[kRsa3072NumWords / 2] = {
+    0x2ea1c4f3, 0xfc66f8f8, 0x14f3a7a1, 0x7bc379a7, 0x4ead8bc9, 0xa6deed,
+    0x3ce15fd7, 0x728a5f2,  0x137b7369, 0x5148e796, 0x4b35584,  0xfd3198c0,
+    0x27b7bd07, 0xd1f161c2, 0x3fe253b1, 0x776469d8, 0x2ff32c90, 0x60e7e92b,
+    0xc4634b76, 0x92ef2f4,  0x6f47669c, 0x646656d3, 0x84ba2a40, 0x644b9d6c,
+    0x46aa19de, 0xac1775f8, 0x4544e5b5, 0xc2016a75, 0xe9e0123b, 0x2a68042b,
+    0x1e4ae26a, 0xe5694a01, 0xd4f37598, 0x90dbad6f, 0x73c1fcd1, 0xd038763c,
+    0xc4a259da, 0xf346012e, 0xcc1ceddb, 0xa58dc466, 0xd98f53bf, 0xc23171b1,
+    0x99d751f5, 0xb0cbd5d5, 0x1c51a0a8, 0x3b583faf, 0x94e9ca26, 0xcedad392,
+};
+
+static uint32_t kTestPrivateExponentComponentP[kRsa3072NumWords / 2] = {
+    0x8d4c3841, 0xb47d2df,  0x78d7e5cd, 0xa813c5d1, 0x88a5ea0e, 0x7e645d47,
+    0xa0234973, 0x9e9f6c13, 0x63aaa6bc, 0xe9499bd,  0xc460330c, 0x8c6f1c30,
+    0x574669c4, 0x40f08ad8, 0xf7ecd674, 0xe6f44b6,  0x973659ae, 0x8f8a5927,
+    0xd3487ce8, 0x60c3d55e, 0xb435892b, 0x5666de34, 0x794e7453, 0x45fd426a,
+    0xe44fbfd5, 0x66bc0c93, 0x3aa737d2, 0x90fca9f9, 0x69e76acd, 0x6ba875fa,
+    0x55e10f38, 0xf6b12022, 0x1a119c21, 0x58b5c16b, 0x14bf7b98, 0x1c80a387,
+    0x280ab1c4, 0x84f513c3, 0xf6a4c8b,  0x687217ba, 0xe087f11d, 0x8d4259bc,
+    0x454af9,   0xcff6d9cd, 0xac279129, 0x351b6fb4, 0x85357c74, 0x866381de,
+};
+
+static uint32_t kTestPrivateExponentComponentQ[kRsa3072NumWords / 2] = {
+    0x4f94d00b, 0xcaacdde0, 0x81aa7fd7, 0xc265ae41, 0x326c9940, 0x8b427abf,
+    0x3a8f513a, 0x35580c14, 0xebfa05c1, 0x52b27b33, 0x7619c80c, 0xa5e076dc,
+    0xdef8c89c, 0xd42498c4, 0x753d842c, 0x44858361, 0x7e0b2e5f, 0x9da6b987,
+    0x9868b4ce, 0xb7ecb1ac, 0x381254c5, 0xa273df4e, 0x29aa3f66, 0xe8fd5603,
+    0xd6fe3210, 0x24041fe2, 0xf4c60024, 0x42cb4edf, 0x94713c64, 0xd3f5212c,
+    0x10f126,   0xad37458f, 0x820f1d42, 0x5a0b1136, 0xe000246d, 0x77fdaca4,
+    0xf244711b, 0xdceeefad, 0xc968d70a, 0xb73ee87d, 0xc0e913b3, 0x70629c,
+    0xdbf9ea12, 0xeeb64955, 0x3d24759f, 0x2ec3bd38, 0xd0def2f7, 0x8d57af0b,
+};
+
+static uint32_t kTestCrtCoefficient[kRsa3072NumWords / 2] = {
+    0x95932eaa, 0x59702111, 0x2ac49f32, 0x294792d7, 0x8ad3e891, 0x5b5a0c15,
+    0x2b6e7c2d, 0x56e13332, 0xe2a6188e, 0x4062dc8d, 0xdaa62268, 0xf28f7c86,
+    0x959632bd, 0xb85a7f81, 0xa5885ac,  0x44a95688, 0x871011f5, 0xd5fae09d,
+    0xd18a788a, 0x17dc874f, 0x1c9367f2, 0x94ba8be8, 0xdcd7ea3c, 0xd872e83e,
+    0x58690c6c, 0xf7f17944, 0x5b7a09ef, 0x2c9440e6, 0x98a67461, 0xc0ffe122,
+    0x17a3638,  0x733a43ea, 0x78476d0d, 0xaf954cab, 0x687da12f, 0x7480080e,
+    0xd573ce7c, 0xdc8e3c64, 0xa740368d, 0x17af4d83, 0xc45af0e2, 0xdd51be35,
+    0xfe85d4f0, 0xa0871757, 0xda54186d, 0x9b3ed119, 0xfe9b64d6, 0x66f89262,
+};
+
 static uint32_t kTestPublicExponent = 65537;
 
 // Message data for testing.
@@ -172,14 +214,25 @@ static status_t run_rsa_3072_decrypt(const uint8_t *label, size_t label_len,
                                      const uint32_t *ciphertext, uint8_t *msg,
                                      size_t *msg_len) {
   // Create two shares for the private exponent (second share is all-zero).
-  otcrypto_const_word32_buf_t d_share0 = {
-      .data = kTestPrivateExponent,
-      .len = ARRAYSIZE(kTestPrivateExponent),
+  otcrypto_const_word32_buf_t p = {
+      .data = kTestCofactorP,
+      .len = ARRAYSIZE(kTestCofactorP),
   };
-  uint32_t share1[ARRAYSIZE(kTestPrivateExponent)] = {0};
-  otcrypto_const_word32_buf_t d_share1 = {
-      .data = share1,
-      .len = ARRAYSIZE(share1),
+  otcrypto_const_word32_buf_t q = {
+      .data = kTestCofactorQ,
+      .len = ARRAYSIZE(kTestCofactorQ),
+  };
+  otcrypto_const_word32_buf_t d_p = {
+      .data = kTestPrivateExponentComponentP,
+      .len = ARRAYSIZE(kTestPrivateExponentComponentP),
+  };
+  otcrypto_const_word32_buf_t d_q = {
+      .data = kTestPrivateExponentComponentQ,
+      .len = ARRAYSIZE(kTestPrivateExponentComponentQ),
+  };
+  otcrypto_const_word32_buf_t i_q = {
+      .data = kTestCrtCoefficient,
+      .len = ARRAYSIZE(kTestCrtCoefficient),
   };
 
   // Construct the private key.
@@ -202,9 +255,9 @@ static status_t run_rsa_3072_decrypt(const uint8_t *label, size_t label_len,
       .data = kTestModulus,
       .len = ARRAYSIZE(kTestModulus),
   };
-  TRY(otcrypto_rsa_private_key_from_exponents(kOtcryptoRsaSize3072, modulus,
-                                              kTestPublicExponent, d_share0,
-                                              d_share1, &private_key));
+  TRY(otcrypto_rsa_private_key_from_exponents(kOtcryptoRsaSize3072, modulus, p,
+                                              q, kTestPublicExponent, d_p, d_q,
+                                              i_q, &private_key));
 
   otcrypto_byte_buf_t plaintext_buf = {.data = msg, .len = kMaxPlaintextBytes};
   otcrypto_const_byte_buf_t label_buf = {.data = label, .len = label_len};
