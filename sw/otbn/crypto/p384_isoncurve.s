@@ -34,7 +34,7 @@
  * @param[in]    w31: all-zero
  * @param[in]  FG0.Z: boolean indicating (complement of) fault condition
  *
- * clobbered registers: x2
+ * clobbered registers: x2, x3
  * clobbered flag groups: none
  */
  .globl trigger_fault_if_fg0_not_z
@@ -220,16 +220,11 @@ p384_isoncurve_check:
 
   /* Compare the two sides of the equation.
        FG0.Z <= (y^2) mod p == (x^2 + ax + b) mod p */
-  bn.sub    w0, w4, w6
-  bn.subb   w1, w5, w7
-
-  bn.cmp    w0, w31
-
+  bn.cmp    w4, w6
   /* Fail if FG0.Z is false. */
   jal       x1, trigger_fault_if_fg0_not_z
 
-  bn.cmp    w1, w31
-
+  bn.cmp    w5, w7
   /* Fail if FG0.Z is false. */
   jal       x1, trigger_fault_if_fg0_not_z
 
@@ -315,8 +310,63 @@ p384_check_public_key:
   unimp
 
   _y_valid:
-  jal       x1, p384_isoncurve_check
+  /* Fill gpp registers with pointers to variables */
+  la        x22, rhs
+  la        x23, lhs
 
+  /* Compute both sides of the Weierstrauss equation.
+       dmem[rhs] <= (x^3 + ax + b) mod p
+       dmem[lhs] <= (y^2) mod p */
+  jal       x1, p384_isoncurve
+
+  /* Load both sides of the equation.
+       [w7, w6] <= dmem[rhs]
+       [w5, w4] <= dmem[lhs] */
+  li        x2, 6
+  bn.lid    x2++, 0(x22)
+  bn.lid    x2, 32(x22)
+  li        x2, 4
+  bn.lid    x2++, 0(x23)
+  bn.lid    x2, 32(x23)
+
+  /* Compare the two sides of the equation.
+       FG0.Z <= (y^2) mod p == (x^2 + ax + b) mod p */
+  bn.cmp    w4, w6
+  /* Fail if FG0.Z is false. */
+  jal       x1, trigger_input_error_if_fg0_not_z
+
+  bn.cmp    w5, w7
+  /* Fail if FG0.Z is false. */
+  jal       x1, trigger_input_error_if_fg0_not_z
+
+  ret
+
+
+/**
+ * If the flag is 0, then this routine will sets `ok` to false and end the
+ * execution of the OTBN program. If the flag is 1, the routine will
+ * essentially do nothing.
+ *
+ * @param[in]  FG0.Z: boolean indicating fault condition
+ *
+ * clobbered registers: x2
+ * clobbered flag groups: none
+ */
+trigger_input_error_if_fg0_not_z:
+  /* Fail if FG0.Z is false. */
+  csrrs     x2, FG0, x0
+  srli      x2, x2, 3
+  andi      x2, x2, 1
+  bne       x2, x0, _pt_reg_valid
+  jal       x0, p384_invalid_input
+
+  /* Extra unimps in case an attacker tries to skip the jump, since this one is
+     especially critical. */
+  unimp
+  unimp
+  unimp
+
+  _pt_reg_valid:
   ret
 
 /**
