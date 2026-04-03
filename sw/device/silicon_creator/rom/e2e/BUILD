@@ -237,22 +237,34 @@ pavona_test(
 # The below three rule sets (vmem_file, scramble_flash_vmem, and filegroup)
 # are needed to run `sigverify_always` tests in DV.
 [
-    vmem_file(
-        name = "empty_test_slot_{}_{}_corrupted_sim_dv_vmem64_signed".format(slot, key),
-        testonly = True,
-        src = ":empty_test_slot_{}_{}_corrupted_sim_dv_signed_bin".format(slot, key),
-        word_size = 64,  # Backdoor-load VMEM image uses 64-bit words
-    )
-    for slot in SLOTS
-    for key in SIGVERIFY_LC_KEYS
-]
-
-[
-    scramble_flash_vmem(
-        name = "empty_test_slot_{}_{}_corrupted_sim_dv_scr_vmem64_signed".format(slot, key),
-        testonly = True,
-        src = ":empty_test_slot_{}_{}_corrupted_sim_dv_vmem64_signed".format(slot, key),
-    )
+    [
+        # 32-bit unscrambled
+        vmem_file(
+            name = "empty_test_slot_{}_{}_corrupted_sim_dv_vmem32_signed".format(slot, key),
+            testonly = True,
+            src = ":empty_test_slot_{}_{}_corrupted_sim_dv_signed_bin".format(slot, key),
+            # Override the name to match what the dv testbench expects.
+            out = "empty_test_slot_{}_corrupted_sim_dv.{}.signed".format(slot, key),
+            word_size = 32,  # Backdoor-load VMEM image to CTN uses 64-bit words
+        ),
+        # 64-bit unscrambled
+        vmem_file(
+            name = "empty_test_slot_{}_{}_corrupted_sim_dv_vmem64_signed".format(slot, key),
+            testonly = True,
+            src = ":empty_test_slot_{}_{}_corrupted_sim_dv_signed_bin".format(slot, key),
+            # Override the name to match what the dv testbench expects.
+            out = "empty_test_slot_{}_corrupted_sim_dv.{}.signed".format(slot, key),
+            word_size = 64,  # Backdoor-load VMEM image to flash uses 64-bit words
+        ),
+        # 64-bit scrambled
+        scramble_flash_vmem(
+            name = "empty_test_slot_{}_{}_corrupted_sim_dv_scr_vmem64_signed".format(slot, key),
+            testonly = True,
+            src = ":empty_test_slot_{}_{}_corrupted_sim_dv_vmem64_signed".format(slot, key),
+            # Override the name to match what the dv testbench expects.
+            out = "empty_test_slot_{}_corrupted_sim_dv.{}.signed.64".format(slot, key),
+        ),
+    ]
     for slot in SLOTS
     for key in SIGVERIFY_LC_KEYS
 ]

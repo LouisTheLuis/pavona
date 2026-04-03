@@ -80,7 +80,7 @@ obj_transform = rv_rule(
 )
 
 def _vmem_file_impl(ctx):
-    outputs = [convert_to_vmem(ctx)]
+    outputs = [convert_to_vmem(ctx, name = ctx.attr.out or ctx.attr.name)]
     return [
         DefaultInfo(
             files = depset(outputs),
@@ -95,6 +95,10 @@ vmem_file = rv_rule(
             allow_single_file = True,
             doc = "Binary file to convert to vmem format",
         ),
+        "out": attr.string(
+            default = "",
+            doc = "Optional name for the output file. If provided the output name will be <out>.<word_size>.vmem otherwise <name>.<word_size>.vmem.",
+        ),
         "word_size": attr.int(
             default = 64,
             doc = "Word size of VMEM file",
@@ -105,7 +109,7 @@ vmem_file = rv_rule(
 )
 
 def _scramble_flash_vmem_impl(ctx):
-    outputs = [scramble_flash(ctx, suffix = "scr.vmem", name = ctx.attr.out or None)]
+    outputs = [scramble_flash(ctx, suffix = "scr.vmem", name = ctx.attr.out or ctx.attr.name)]
 
     return [
         DefaultInfo(
