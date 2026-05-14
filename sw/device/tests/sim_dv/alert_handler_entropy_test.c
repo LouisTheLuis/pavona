@@ -13,7 +13,6 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top/alert_handler_regs.h"  // Generated.
-#include "hw/top_egret/sw/autogen/top_egret.h"
 
 /*
   In SV test, force the alert_handler's wait_cyc_mask_i input to shorten the
@@ -83,9 +82,7 @@ static void alert_handler_config(void) {
 }
 
 bool test_main(void) {
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(TOP_EGRET_ALERT_HANDLER_BASE_ADDR),
-      &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init_from_dt(kDtAlertHandler, &alert_handler));
 
   alert_handler_config();
   return true;

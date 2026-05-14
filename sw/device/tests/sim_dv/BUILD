@@ -656,10 +656,13 @@ pavona_test(
 pavona_test(
     name = "alert_handler_entropy_test",
     srcs = ["alert_handler_entropy_test.c"],
-    exec_env = {"//hw/top_egret:sim_dv": None},
+    exec_env = {
+        "//hw/top_dragonfly:sim_dv": None,
+        "//hw/top_egret:sim_dv": None,
+    },
     deps = [
+        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:mmio",
