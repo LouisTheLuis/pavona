@@ -478,6 +478,7 @@ pavona_test(
     srcs = ["alert_handler_lpg_reset_toggle.c"],
     exec_env = dicts.add(
         EGRET_SILICON_OWNER_ROM_EXT_ENVS,
+        DRAGONFLY_TEST_ENVS,
         # The test requires the Ibex core to wait long enough
         # before checking for the ping_timeout error.
         # The wait-time for the Verilator would be around
@@ -498,12 +499,11 @@ pavona_test(
         timeout = "moderate",
     ),
     deps = [
+        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
         "//hw/top:i2c_c_regs",
         "//hw/top:spi_device_c_regs",
         "//hw/top:spi_host_c_regs",
-        "//hw/top:usbdev_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
         "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:alert_handler",
@@ -512,7 +512,6 @@ pavona_test(
         "//sw/device/lib/dif:rv_plic",
         "//sw/device/lib/dif:spi_device",
         "//sw/device/lib/dif:spi_host",
-        "//sw/device/lib/dif:usbdev",
         "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:irq",
         "//sw/device/lib/runtime:log",
@@ -522,7 +521,19 @@ pavona_test(
         "//sw/device/lib/testing:rstmgr_testutils",
         "//sw/device/lib/testing:rv_plic_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
+    ] + pavona_select_top(
+        {
+            "egret": [
+                "//hw/top_egret/sw/autogen:top_egret",
+                "//sw/device/lib/dif:usbdev",
+                "//hw/top:usbdev_c_regs",
+            ],
+            "dragonfly": [
+                "//hw/top_dragonfly/sw/autogen:top_dragonfly",
+            ],
+        },
+        []
+    ),
 )
 
 pavona_test(
