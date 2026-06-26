@@ -31,6 +31,7 @@ class mbx_scoreboard extends cip_base_scoreboard #(
   bit m_ibmbx_start = 1'b1;
   bit [top_pkg::TL_DW-1:0] m_ib_data_q[$]; // Inbound data (request to RoT).
   bit [top_pkg::TL_DW-1:0] m_ob_data_q[$]; // Outbound data (response from RoT).
+  bit m_drop_ob_rsp = 1'b0;
 
   // System RAL model; keep a local handle for cleaner/easier access.
   mbx_soc_reg_block m_mbx_soc_ral;
@@ -132,6 +133,9 @@ class mbx_scoreboard extends cip_base_scoreboard #(
     m_mbx_error   = 1'b0;
     m_mbx_abort   = 1'b0;
     m_ibmbx_start = 1'b1;
+    m_ob_data_q.delete();
+    m_obdwcnt = 0;
+    m_drop_ob_rsp = 1'b1;
   endfunction
 
   // Model TL-UL register accesses. There are two TL-UL register interfaces:
@@ -235,6 +239,7 @@ class mbx_scoreboard extends cip_base_scoreboard #(
         end
 
         "outbound_object_size": begin
+          m_drop_ob_rsp = 1'b0;
           m_ob_data_q.delete();
           m_obdwcnt = get_field_val(ral.outbound_object_size.cnt, item.a_data);
           `uvm_info(`gfn, $sformatf("Updating m_obdwcnt to %0d", m_obdwcnt), UVM_LOW)
@@ -526,9 +531,10 @@ class mbx_scoreboard extends cip_base_scoreboard #(
             `DV_CHECK_EQ(item.d_data, 0, "Read of WDATA returned non-zero value")
           end
           "rdata": begin
-            uvm_reg_data_t exp_data = 0;
-            if (m_ob_data_q.size() > 0) exp_data = m_ob_data_q[0];
-            `DV_CHECK_EQ(item.d_data, exp_data, "RDATA read data mismatched")
+            if (!m_drop_ob_rsp && m_mbx_ready && m_ob_data_q.size() > 0) begin
+              uvm_reg_data_t exp_data = m_ob_data_q[0];
+              `DV_CHECK_EQ(item.d_data, exp_data, "RDATA read data mismatched")
+            end
           end
           default: `dv_fatal($sformatf("SoC memory '%s' read not handled", mem.get_name()))
         endcase
@@ -579,6 +585,11 @@ class mbx_scoreboard extends cip_base_scoreboard #(
     end else if (data_phase_read) begin
       bit is_addr_match;
 
+      if (m_drop_ob_rsp) begin
+        `uvm_info(`gfn, "Dropping outbound SRAM read response after mailbox cleanup", UVM_MEDIUM)
+        return;
+      end
+
       // Check if address is within OB Mailbox SRAM range
       is_addr_match = (item.a_addr >= ral.outbound_base_address.get()) &&
                       (item.a_addr <= ral.outbound_limit_address.get());
@@ -608,12 +619,17 @@ class mbx_scoreboard extends cip_base_scoreboard #(
     m_ob_data_q.delete();
     m_ibmbx_ptr = 0;
     m_obmbx_ptr = 0;
+    m_ib_wdata_ptr = 0;
     m_obdwcnt = 0;
     m_mbx_busy = 1'b0;
+    m_mbx_ready = 1'b0;
     m_mbx_error = 1'b0;
+    m_mbx_abort = 1'b0;
     m_mbx_async_msg = 1'b0;
     m_ibmbx_start = 1'b1;
+    m_drop_ob_rsp = 1'b0;
     exp_mbx_core_irq = 0;
+    exp_mbx_core_irq_q.delete();
   endfunction
 
   function void check_phase(uvm_phase phase);
