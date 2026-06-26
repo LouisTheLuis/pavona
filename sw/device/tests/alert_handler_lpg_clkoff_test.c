@@ -39,6 +39,7 @@
 #include "hw/top/spi_host_regs.h"
 #if defined(OPENTITAN_IS_EGRET)
 #include "sw/device/lib/dif/dif_usbdev.h"
+
 #include "hw/top/usbdev_regs.h"
 #endif
 #include "sw/device/lib/testing/autogen/isr_testutils.h"
@@ -96,7 +97,6 @@ static alert_handler_isr_ctx_t alert_handler_ctx = {
  * Initialize the peripherals used in this test.
  */
 static void init_peripherals(void) {
-
   CHECK_DIF_OK(dif_rv_plic_init_from_dt(kDtRvPlic, &plic));
   CHECK_DIF_OK(dif_alert_handler_init_from_dt(kDtAlertHandler, &alert_handler));
   CHECK_DIF_OK(dif_clkmgr_init_from_dt(kDtClkmgrAon, &clkmgr));
@@ -118,19 +118,17 @@ static void init_peripherals(void) {
 static const uint32_t aes_alerts[] = {kTopEgretAlertIdAesFatalFault,
                                       kTopEgretAlertIdAesRecovCtrlUpdateErr};
 static const uint32_t hmac_alerts[] = {kTopEgretAlertIdHmacFatalFault};
-static const uint32_t kmac_alerts[] = {
-    kTopEgretAlertIdKmacFatalFaultErr,
-    kTopEgretAlertIdKmacRecovOperationErr};
+static const uint32_t kmac_alerts[] = {kTopEgretAlertIdKmacFatalFaultErr,
+                                       kTopEgretAlertIdKmacRecovOperationErr};
 static const uint32_t acc_alerts[] = {kTopEgretAlertIdAccFatal,
                                       kTopEgretAlertIdAccRecov};
-static const uint32_t spihost0_alerts[] = {
-    kTopEgretAlertIdSpiHost0FatalFault};
-static const uint32_t spihost1_alerts[] = {
-    kTopEgretAlertIdSpiHost1FatalFault};
+static const uint32_t spihost0_alerts[] = {kTopEgretAlertIdSpiHost0FatalFault};
+static const uint32_t spihost1_alerts[] = {kTopEgretAlertIdSpiHost1FatalFault};
 static const uint32_t usbdev_alerts[] = {kTopEgretAlertIdUsbdevFatalFault};
 #elif defined(OPENTITAN_IS_DRAGONFLY)
-static const uint32_t aes_alerts[] = {kTopDragonflyAlertIdAesFatalFault,
-                                      kTopDragonflyAlertIdAesRecovCtrlUpdateErr};
+static const uint32_t aes_alerts[] = {
+    kTopDragonflyAlertIdAesFatalFault,
+    kTopDragonflyAlertIdAesRecovCtrlUpdateErr};
 static const uint32_t hmac_alerts[] = {kTopDragonflyAlertIdHmacFatalFault};
 static const uint32_t kmac_alerts[] = {
     kTopDragonflyAlertIdKmacFatalFaultErr,

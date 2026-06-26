@@ -24,10 +24,12 @@
 #if defined(OPENTITAN_IS_EGRET)
 #include "sw/device/lib/dif/dif_keymgr.h"
 #include "sw/device/lib/testing/keymgr_testutils.h"
+
 #include "hw/top_egret/sw/autogen/top_egret.h"
 #elif defined(OPENTITAN_IS_DRAGONFLY)
 #include "sw/device/lib/dif/dif_keymgr_dpe.h"
 #include "sw/device/lib/testing/keymgr_dpe_testutils.h"
+
 #include "hw/top_dragonfly/sw/autogen/top_dragonfly.h"
 #endif
 
@@ -219,7 +221,7 @@ bool test_main(void) {
   if (rst_info & kDifRstmgrResetInfoPor) {
     // Initialize keymgr_dpe with otp contents, this will cause a SW reset
     CHECK_STATUS_OK(keymgr_dpe_testutils_startup(&keymgr_dpe,
-                                                /*slot_dst_sel=*/1));
+                                                 /*slot_dst_sel=*/1));
 
     // Stop execution here and just wait for something to happen
     wait_for_interrupt();
@@ -231,7 +233,7 @@ bool test_main(void) {
 
     // Finish initialization of keymgr_dpe
     CHECK_STATUS_OK(keymgr_dpe_testutils_startup(&keymgr_dpe,
-                                                /*slot_dst_sel=*/1));
+                                                 /*slot_dst_sel=*/1));
     // Clear the rstmgr SW initialized reset
     rstmgr_testutils_reason_clear();
 

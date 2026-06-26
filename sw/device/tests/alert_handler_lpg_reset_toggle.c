@@ -31,9 +31,10 @@
 #include "hw/top/spi_device_regs.h"
 #include "hw/top/spi_host_regs.h"
 #if defined(OPENTITAN_IS_EGRET)
-#include "hw/top_egret/sw/autogen/top_egret.h"
 #include "sw/device/lib/dif/dif_usbdev.h"
+
 #include "hw/top/usbdev_regs.h"
+#include "hw/top_egret/sw/autogen/top_egret.h"
 #elif defined(OPENTITAN_IS_DRAGONFLY)
 #include "hw/top_dragonfly/sw/autogen/top_dragonfly.h"
 #endif
@@ -68,7 +69,8 @@ static void init_peripherals(void) {
   CHECK_DIF_OK(dif_i2c_init_from_dt(kDtI2c0, &i2c0));
   CHECK_DIF_OK(dif_rv_core_ibex_init_from_dt(kDtRvCoreIbex, &ibex));
   CHECK_DIF_OK(dif_spi_device_init(
-      mmio_region_from_addr(dt_spi_device_primary_reg_block(kDtSpiDevice)), &spi_dev.dev));
+      mmio_region_from_addr(dt_spi_device_primary_reg_block(kDtSpiDevice)),
+      &spi_dev.dev));
   CHECK_DIF_OK(dif_spi_host_init_from_dt((dt_spi_host_t)0, &spi_host0));
 
 #if defined(OPENTITAN_IS_EGRET)
@@ -77,7 +79,6 @@ static void init_peripherals(void) {
   CHECK_DIF_OK(dif_i2c_init_from_dt(kDtI2c1, &i2c1));
   CHECK_DIF_OK(dif_i2c_init_from_dt(kDtI2c2, &i2c2));
 #endif
-
 
   // Enable all the alert_handler interrupts used in this test.
 #if defined(OPENTITAN_IS_EGRET)
@@ -93,10 +94,8 @@ static void init_peripherals(void) {
 
 // List of alerts
 #if defined(OPENTITAN_IS_EGRET)
-static const uint32_t spidev_alerts[] = {
-    kTopEgretAlertIdSpiDeviceFatalFault};
-static const uint32_t spihost0_alerts[] = {
-    kTopEgretAlertIdSpiHost0FatalFault};
+static const uint32_t spidev_alerts[] = {kTopEgretAlertIdSpiDeviceFatalFault};
+static const uint32_t spihost0_alerts[] = {kTopEgretAlertIdSpiHost0FatalFault};
 static const uint32_t i2c0_alerts[] = {kTopEgretAlertIdI2c0FatalFault};
 #elif defined(OPENTITAN_IS_DRAGONFLY)
 static const uint32_t spidev_alerts[] = {
@@ -111,8 +110,7 @@ static const uint32_t num_spidev_alerts = ARRAYSIZE(spidev_alerts);
 static const uint32_t num_i2c0_alerts = ARRAYSIZE(i2c0_alerts);
 
 #if defined(OPENTITAN_IS_EGRET)
-static const uint32_t spihost1_alerts[] = {
-    kTopEgretAlertIdSpiHost1FatalFault};
+static const uint32_t spihost1_alerts[] = {kTopEgretAlertIdSpiHost1FatalFault};
 static const uint32_t usbdev_alerts[] = {kTopEgretAlertIdUsbdevFatalFault};
 static const uint32_t i2c1_alerts[] = {kTopEgretAlertIdI2c1FatalFault};
 static const uint32_t i2c2_alerts[] = {kTopEgretAlertIdI2c2FatalFault};
