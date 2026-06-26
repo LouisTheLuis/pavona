@@ -52,16 +52,24 @@ module mbx_ombx #(
   logic mbx_empty, mbx_read, mbx_sys_abort;
   logic set_first_req, clear_first_req;
 
+  // Abort has been requested by the SoC but not yet acknowledged on the host side.
+  logic aborting;
+  assign aborting = sysif_control_abort_set_i | mbx_sys_abort;
+
+  logic block_read_req;
+  assign block_read_req = mbx_error_set_i | aborting | hostif_control_abort_clear_i;
+
   // Generate the read request
   // - Mbx reader ACK the current read data and initiate the first request
   // First is initiated by mbx owner writes object size register
   // Note that pointer comparison with hostif_limit_i is inclusive, while comparison with internal
   // limit of the object size is exclusive
   logic read_req, first_req_q;
-  assign read_req = first_req_q |
-                    (mbx_read & sysif_read_data_write_valid_i   &
-                    (sram_read_ptr_q <= hostif_limit_i)         &
-                    (sram_read_ptr_q < sram_read_ptr_limit_q));
+  assign read_req = ~block_read_req &
+                    (first_req_q |
+                     (mbx_read & sysif_read_data_write_valid_i   &
+                     (sram_read_ptr_q <= hostif_limit_i)         &
+                     (sram_read_ptr_q < sram_read_ptr_limit_q)));
 
   // Waiting for a read request to be accepted onto the TL-UL bus; reset state if the host side
   // is acknowledging an Abort request from the SoC side.
@@ -71,7 +79,7 @@ module mbx_ombx #(
 
   // Create a sticky TL-UL read request until its granted
   logic req_q;
-  assign ombx_sram_read_req_o = read_req | req_q;
+  assign ombx_sram_read_req_o = ~block_read_req & (read_req | req_q);
 
   prim_flop #(
     .Width(1)
@@ -89,11 +97,12 @@ module mbx_ombx #(
   // Block the request from TL-UL until the SRAM read is complete
   // Note that pointer comparison with hostif_limit_i is inclusive, while comparison with internal
   // limit of the object size is exclusive
-  assign set_pending   = mbx_read & sysif_read_data_write_valid_i &
+  assign set_pending   = ~block_read_req                          &
+                        mbx_read & sysif_read_data_write_valid_i  &
                         (sram_read_ptr_q <= hostif_limit_i)       &
                         (sram_read_ptr_q < sram_read_ptr_limit_q);
-  // Reset state if the host side is acknowledging an Abort request.
-  assign clear_pending = ombx_sram_read_resp_valid_i | hostif_control_abort_clear_i;
+  // Reset state if cleanup prevents the pending read from completing normally.
+  assign clear_pending = ombx_sram_read_resp_valid_i | block_read_req;
 
   prim_flop #(
     .Width(1)
@@ -150,10 +159,6 @@ module mbx_ombx #(
     .q_o   ( sram_read_ptr_q                  )
   );
   assign ombx_sram_read_ptr_o = sram_read_ptr_q;
-
-  // Abort has been requested by the SoC but not yet acknowledged on the host side.
-  logic aborting;
-  assign aborting = sysif_control_abort_set_i | mbx_sys_abort;
 
   // Clear ombx read data register when all data is read, an error happens, or an Abort or
   // FW-initiated reset occurs.
