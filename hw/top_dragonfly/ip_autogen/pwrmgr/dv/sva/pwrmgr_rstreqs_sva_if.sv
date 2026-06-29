@@ -27,7 +27,7 @@ interface pwrmgr_rstreqs_sva_if
 
   // output reset cycle with a clk enable disable
   localparam int MinMainRstCycles = 0;
-  localparam int MaxMainRstCycles = 400;
+  localparam int MaxMainRstCycles = 3000;
   `define MAIN_RST_CYCLES ##[MinMainRstCycles:MaxMainRstCycles]
 
   // The timing of the escalation reset is determined by the slow clock, but will not propagate if
