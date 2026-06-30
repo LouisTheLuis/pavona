@@ -60,7 +60,18 @@
         "rv_dm_buffered_enable",
         "rv_dm_sparse_lc_gate_fsm",
         "rv_dm_stress_all",
-        "rv_dm_stress_all_with_rand_reset"
+        "rv_dm_stress_all_with_rand_reset",
+        "rv_dm_sec_cm",
+        "rv_dm_tl_errors",
+        "rv_dm_tl_intg_err",
+        "rv_dm_alert_test",
+        "rv_dm_mem_walk",
+        "rv_dm_mem_partial_access",
+        "rv_dm_csr_hw_reset",
+        "rv_dm_csr_rw",
+        "rv_dm_csr_bit_bash",
+        "rv_dm_same_csr_outstanding",
+        "rv_dm_csr_mem_rw_with_rand_reset"
       ]
     }
   ]
