@@ -23,8 +23,13 @@ class rv_dm_stress_all_vseq extends rv_dm_base_vseq;
                           "rv_dm_jtag_dtm_hard_reset_vseq",
                           "rv_dm_jtag_dmi_dm_inactive_vseq",
                           "rv_dm_jtag_dtm_idle_hint_vseq",
-                          "rv_dm_jtag_dmi_debug_disabled_vseq",
-                          "rv_dm_scanmode_vseq"};
+`ifndef USE_DMI_INTERFACE
+                          // rv_dm_scanmode_vseq relies on the in-DUT JTAG path. The
+                          // USE_DMI_INTERFACE variant drives DMI through the external TLUL
+                          // JTAG-DTM helper, so keep scanmode out of stress_all there.
+                          "rv_dm_scanmode_vseq",
+`endif
+                          "rv_dm_jtag_dmi_debug_disabled_vseq"};
     for (int i = 1; i <= num_trans; i++) begin
       uvm_sequence    seq;
       rv_dm_base_vseq rv_dm_vseq;
