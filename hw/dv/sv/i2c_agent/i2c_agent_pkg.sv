@@ -86,8 +86,11 @@ package i2c_agent_pkg;
   `include "i2c_agent_cov.sv"
   `include "i2c_monitor.sv"
   `include "i2c_driver.sv"
+  `include "i2c_rst_safe_monitor.sv"
+  `include "i2c_rst_safe_driver.sv"
   `include "i2c_sequencer.sv"
   `include "i2c_agent.sv"
+  `include "i2c_rst_safe_agent.sv"
   `include "seq_lib/i2c_seq_list.sv"
 
 endpackage: i2c_agent_pkg

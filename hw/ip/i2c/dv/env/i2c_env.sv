@@ -8,7 +8,7 @@ class i2c_env extends cip_base_env #(
     .VIRTUAL_SEQUENCER_T  (i2c_virtual_sequencer),
     .SCOREBOARD_T         (i2c_scoreboard));
 
-  i2c_agent m_i2c_agent;
+  i2c_rst_safe_agent  m_i2c_agent;
   i2c_reference_model model;
 
   `uvm_component_utils(i2c_env)
@@ -20,7 +20,7 @@ class i2c_env extends cip_base_env #(
       this, "", "i2c_dv_vif", cfg.i2c_dv_vif)) begin
       `uvm_fatal(`gfn, "failed to get i2c_dv_vif from uvm_config_db")
     end
-    m_i2c_agent = i2c_agent::type_id::create("m_i2c_agent", this);
+    m_i2c_agent = i2c_rst_safe_agent::type_id::create("m_i2c_agent", this);
     uvm_config_db#(i2c_agent_cfg)::set(this, "m_i2c_agent*", "cfg", cfg.m_i2c_agent_cfg);
     cfg.m_i2c_agent_cfg.en_cov = cfg.en_cov;
     cfg.m_i2c_agent_cfg.en_monitor = 1'b1;
