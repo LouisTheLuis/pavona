@@ -118,8 +118,14 @@ module tb;
 
   jtag_mon_if mon_jtag_if ();
 `ifdef USE_DMI_INTERFACE
-  // TODO: In this case, what should the monitor see? Perhaps there should be no JTAG signaling
-  // and thus no monitor, but presently the vseqs depend upon the monitor directly.
+  // In this configuration, the DUT's JTAG pins are unused and DMI traffic enters rv_dm through the
+  // TLUL JTAG-DTM helper above. The RV_DM sequences and scoreboard still depend on the JTAG monitor
+  // to predict DMI/SBA register accesses, so monitor the helper-facing JTAG pins.
+  assign mon_jtag_if.tck    = jtag_if.tck;
+  assign mon_jtag_if.trst_n = jtag_if.trst_n;
+  assign mon_jtag_if.tms    = jtag_if.tms;
+  assign mon_jtag_if.tdi    = jtag_if.tdi;
+  assign mon_jtag_if.tdo    = jtag_if.tdo;
 `else
   // Apply the muxing that we get in rv_dm, where the JTAG interface that actually connects to the
   // debug module has direct clock/reset in scan mode, and is disabled if debug is not enabled.

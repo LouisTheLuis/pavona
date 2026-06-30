@@ -2,6 +2,18 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+class rv_dm_sba_tl_device_seq extends cip_tl_device_seq;
+  `uvm_object_utils(rv_dm_sba_tl_device_seq)
+  `uvm_object_new
+
+  virtual function void randomize_rsp(cip_tl_seq_item rsp);
+    // RV_DM SBA tests intentionally use response delays above the generic TL item [0:50] bound to
+    // create sbbusy scenarios. Keep this relaxation local to the RV_DM SBA responder.
+    rsp.valid_delay_c.constraint_mode(0);
+    super.randomize_rsp(rsp);
+  endfunction
+endclass
+
 class rv_dm_base_vseq extends cip_base_vseq #(
     .RAL_T               (rv_dm_regs_reg_block),
     .CFG_T               (rv_dm_env_cfg),
@@ -110,6 +122,10 @@ class rv_dm_base_vseq extends cip_base_vseq #(
   // SBA TL device sequence. Class member for more controllability.
   protected cip_tl_device_seq m_tl_sba_device_seq;
 
+  // Most sequences use a default SBA TL responder started during dut_init(). SBA access sequences
+  // disable this and start their own responder with test-specific delay/error controls.
+  bit start_sba_tl_device_seq_on_dut_init = 1'b1;
+
   // Handles for convenience.
   jtag_dtm_reg_block jtag_dtm_ral;
   jtag_dmi_reg_block jtag_dmi_ral;
@@ -211,7 +227,9 @@ class rv_dm_base_vseq extends cip_base_vseq #(
       end
     end
     // Start the SBA TL device seq.
-    sba_tl_device_seq_start();
+    if (start_sba_tl_device_seq_on_dut_init) begin
+      sba_tl_device_seq_start();
+    end
   endtask
 
   // Have scan reset also applied at the start.
@@ -259,7 +277,7 @@ class rv_dm_base_vseq extends cip_base_vseq #(
                                        int rsp_abort_pct = 25,
                                        int d_error_pct = 0,
                                        int d_chan_intg_err_pct = 0);
-    m_tl_sba_device_seq = cip_tl_device_seq::type_id::create("m_tl_sba_device_seq");
+    m_tl_sba_device_seq = rv_dm_sba_tl_device_seq::type_id::create("m_tl_sba_device_seq");
     m_tl_sba_device_seq.min_rsp_delay = min_rsp_delay;
     m_tl_sba_device_seq.max_rsp_delay = max_rsp_delay;
     m_tl_sba_device_seq.rsp_abort_pct = rsp_abort_pct;

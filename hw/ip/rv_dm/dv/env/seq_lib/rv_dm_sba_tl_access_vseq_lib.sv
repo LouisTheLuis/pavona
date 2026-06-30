@@ -82,6 +82,13 @@ class rv_dm_sba_tl_access_vseq extends rv_dm_base_vseq;
     read_addr_after_write dist {0 :/ 7, 1 :/ 3};
   }
 
+  task pre_start();
+    // This sequence replaces the default SBA TL responder with one randomized for each iteration.
+    // Skipping the dut_init() auto-start avoids immediately stopping a freshly forked responder.
+    start_sba_tl_device_seq_on_dut_init = 1'b0;
+    super.pre_start();
+  endtask
+
   task body();
     num_times.rand_mode(0);
 
