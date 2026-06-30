@@ -12,4 +12,56 @@
 
   // Use the DMI interface and not the JTAG interace
   build_opts: ["+define+USE_DMI_INTERFACE=1"]
+
+  // rv_dm_scanmode_vseq relies on the in-DUT JTAG path. In this variant the
+  // DMI path is provided through the external TLUL JTAG-DTM helper, so override
+  // the common "all" regression to leave scanmode out for use_dmi_interface.
+  regressions: [
+    {
+      name: all
+      tests: [
+        "rv_dm_csr_aliasing",
+        "rv_dm_smoke",
+        "rv_dm_tap_fsm",
+        "rv_dm_jtag_dtm_csr_hw_reset",
+        "rv_dm_jtag_dtm_csr_rw",
+        "rv_dm_jtag_dtm_csr_bit_bash",
+        "rv_dm_jtag_dtm_csr_aliasing",
+        "rv_dm_jtag_dmi_csr_hw_reset",
+        "rv_dm_jtag_dmi_csr_rw",
+        "rv_dm_jtag_dmi_csr_bit_bash",
+        "rv_dm_jtag_dmi_csr_aliasing",
+        "rv_dm_sba_tl_access",
+        "rv_dm_delayed_resp_sba_tl_access",
+        "rv_dm_bad_sba_tl_access",
+        "rv_dm_autoincr_sba_tl_access",
+        "rv_dm_tap_fsm_rand_reset",
+        "rv_dm_cmderr_busy",
+        "rv_dm_cmderr_not_supported",
+        "rv_dm_cmderr_exception",
+        "rv_dm_mem_tl_access_halted",
+        "rv_dm_mem_tl_access_resuming",
+        "rv_dm_hart_unavail",
+        "rv_dm_cmderr_halt_resume",
+        "rv_dm_dataaddr_rw_access",
+        "rv_dm_halt_resume_whereto",
+        "rv_dm_sba_debug_disabled",
+        "rv_dm_ndmreset_req",
+        "rv_dm_jtag_dtm_idle_hint",
+        "rv_dm_jtag_dmi_dm_inactive",
+        "rv_dm_jtag_dmi_debug_disabled",
+        "rv_dm_jtag_dtm_hard_reset",
+        "rv_dm_abstractcmd_status",
+        "rv_dm_rom_read_access",
+        "rv_dm_progbuf_read_write_execute",
+        "rv_dm_debug_disabled",
+        "rv_dm_dmi_failed_op",
+        "rv_dm_hartsel_warl",
+        "rv_dm_buffered_enable",
+        "rv_dm_sparse_lc_gate_fsm",
+        "rv_dm_stress_all",
+        "rv_dm_stress_all_with_rand_reset"
+      ]
+    }
+  ]
 }
