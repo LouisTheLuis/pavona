@@ -882,7 +882,7 @@ module lc_ctrl
   `ASSERT_KNOWN(HwRevKnown_A,           hw_rev_o                   )
 
   `ASSERT(LcInitDoneSticky_A,
-      lc_tx_test_true_strict(lc_init_done_o)
+      lc_tx_test_true_strict(lc_init_done_o) && otp_lc_data_i.valid
       |=>
       ##1 !$fell(lc_tx_test_true_strict(lc_init_done_o)))
 
