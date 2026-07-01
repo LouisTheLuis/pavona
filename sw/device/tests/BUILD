@@ -328,8 +328,8 @@ pavona_test(
         timeout = "long",
     ),
     deps = [
-        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
+        "//hw/top/dt",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:mmio",
@@ -412,8 +412,8 @@ pavona_test(
     ),
     fpga = fpga_params(timeout = "moderate"),
     deps = [
-        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
+        "//hw/top/dt",
         "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:acc",
@@ -442,7 +442,7 @@ pavona_test(
             ],
             "dragonfly": [],
         },
-        []
+        [],
     ),
 )
 
@@ -491,7 +491,7 @@ pavona_test(
                 "//sw/device/lib/testing:keymgr_dpe_testutils",
             ],
         },
-        []
+        [],
     ),
 )
 
@@ -521,11 +521,11 @@ pavona_test(
         timeout = "moderate",
     ),
     deps = [
-        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
         "//hw/top:i2c_c_regs",
         "//hw/top:spi_device_c_regs",
         "//hw/top:spi_host_c_regs",
+        "//hw/top/dt",
         "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:alert_handler",
@@ -554,7 +554,7 @@ pavona_test(
                 "//hw/top_dragonfly/sw/autogen:top_dragonfly",
             ],
         },
-        []
+        [],
     ),
 )
 

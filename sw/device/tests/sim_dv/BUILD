@@ -679,8 +679,8 @@ pavona_test(
         "//hw/top_egret:sim_dv": None,
     },
     deps = [
-        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
+        "//hw/top/dt",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:mmio",
@@ -698,11 +698,11 @@ pavona_test(
     # The test requires to drive fatal alerts which is possible only in DV sim.
     exec_env = {
         "//hw/top_dragonfly:sim_dv": None,
-        "//hw/top_egret:sim_dv": None
+        "//hw/top_egret:sim_dv": None,
     },
     deps = [
-        "//hw/top/dt",
         "//hw/top:alert_handler_c_regs",
+        "//hw/top/dt",
         "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:alert_handler",
@@ -723,7 +723,7 @@ pavona_test(
     ] + pavona_select_top(
         {
             "egret": ["//hw/top_egret/sw/autogen:top_egret"],
-            "dragonfly": ["//hw/top_dragonfly/sw/autogen:top_dragonfly"]
+            "dragonfly": ["//hw/top_dragonfly/sw/autogen:top_dragonfly"],
         },
         [],
     ),
