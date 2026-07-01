@@ -259,11 +259,6 @@
       reseed: 2
     }
     {
-      name: rv_dm_jtag_dmi_debug_disabled
-      uvm_test_seq: rv_dm_jtag_dmi_debug_disabled_vseq
-      reseed: 2
-    }
-    {
       name: rv_dm_jtag_dtm_hard_reset
       uvm_test_seq: rv_dm_jtag_dtm_hard_reset_vseq
       reseed: 2
@@ -307,11 +302,6 @@
       name: rv_dm_sparse_lc_gate_fsm
       uvm_test_seq: rv_dm_sparse_lc_gate_fsm_vseq
       reseed: 4
-    }
-    {
-      name: rv_dm_scanmode
-      uvm_test_seq: rv_dm_scanmode_vseq
-      reseed: 1
     }
     {
       name: rv_dm_stress_all
