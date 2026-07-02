@@ -18,10 +18,9 @@ class i2c_common_vseq extends i2c_base_vseq;
   endtask : body
 
   virtual task post_start();
-    // if csr test, clean up i2c.OVRD to avoid spurious interrupt caused by
-    // un-intended scl/sda output
-    // default: csr_rw
-    if (common_seq_type == "") begin
+    // Clean up i2c.OVRD for CSR tests that may randomly write it. Leaving override enabled can
+    // continuously reassert scl/sda interference interrupts during generic interrupt cleanup.
+    if (common_seq_type inside {"", "same_csr_outstanding"}) begin
       // clear i2c.OVRDEN
       ral.ovrd.txovrden.set(1'b0);
       csr_update(ral.ovrd);

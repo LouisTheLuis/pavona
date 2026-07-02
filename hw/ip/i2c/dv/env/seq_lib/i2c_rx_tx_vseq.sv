@@ -12,6 +12,9 @@ class i2c_rx_tx_vseq extends i2c_base_vseq;
   // throughout the sequence.
   local uint total_rd_bytes;
 
+  bit fixed_num_wr_bytes;
+  bit fixed_num_rd_bytes;
+
   virtual task body();
     bit do_interrupt = 1'b1;
     initialization();
@@ -122,7 +125,7 @@ class i2c_rx_tx_vseq extends i2c_base_vseq;
   endtask : program_address_to_target
 
   virtual task program_control_read_to_target(bit last_tran);
-    `DV_CHECK_MEMBER_RANDOMIZE_FATAL(num_rd_bytes)
+    if (!fixed_num_rd_bytes) `DV_CHECK_MEMBER_RANDOMIZE_FATAL(num_rd_bytes)
     `DV_CHECK_RANDOMIZE_WITH_FATAL(fmt_item,
       fbyte == num_rd_bytes;
       start == 1'b0;
@@ -190,7 +193,7 @@ class i2c_rx_tx_vseq extends i2c_base_vseq;
 
   virtual task program_write_data_to_target(bit last_tran, bit stopbyte);
     bit [7:0] wr_data[$];
-    `DV_CHECK_MEMBER_RANDOMIZE_FATAL(num_wr_bytes)
+    if (!fixed_num_wr_bytes) `DV_CHECK_MEMBER_RANDOMIZE_FATAL(num_wr_bytes)
     `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(wr_data, wr_data.size == num_wr_bytes;)
     if (num_wr_bytes == 256) begin
       `uvm_info(`gfn, "  write transaction length is 256 byte", UVM_HIGH)

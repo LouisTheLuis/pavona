@@ -539,19 +539,25 @@ class i2c_reference_model extends uvm_component;
     // intermediate states for prediction.
     controller_mode_in_progress_fifo.get(inp_xfer);
     reset_count = controller_mode_reset_count;
-    `DV_CHECK(inp_xfer.state inside {StNone, StStarted})
+    if (inp_xfer.state == StAborted) return;
     `uvm_info(`gfn, $sformatf("create_controller_exp() : Got handle to inp_xfer item :\n%s",
       inp_xfer.sprint()), UVM_DEBUG)
 
     fork
       begin
-        wait(inp_xfer.state == StAddrByteAckRcvd);
+        wait(inp_xfer.state inside {StAddrByteAckRcvd, StDataByte, StDataByteRcvd,
+                                    StDataByteAckRcvd, StStopped, StAborted} ||
+             reset_count != controller_mode_reset_count);
+        if (inp_xfer.state == StAborted || reset_count != controller_mode_reset_count) begin
+          reset_seen = 1'b1;
+        end
         `uvm_info(`gfn, $sformatf(
           "create_controller_exp() got inp_xfer : (address=8'h%2x, rw=1'b%b (%0s))",
           inp_xfer.addr, inp_xfer.dir, inp_xfer.dir.name()), UVM_DEBUG)
 
-        wait(inp_xfer.state == StStopped || reset_count != controller_mode_reset_count);
-        if (reset_count != controller_mode_reset_count) begin
+        wait(inp_xfer.state inside {StStopped, StAborted} ||
+             reset_count != controller_mode_reset_count);
+        if (inp_xfer.state == StAborted || reset_count != controller_mode_reset_count) begin
           reset_seen = 1'b1;
         end else begin
           `uvm_info(`gfn, "create_controller_exp() : Got inp_xfer.state == StStopped.", UVM_DEBUG)
@@ -560,7 +566,8 @@ class i2c_reference_model extends uvm_component;
       end
       begin
         // Optional (UVM_DEBUG) logging routine to print ongoing transfer state changes.
-        while(inp_xfer.state != StStopped && reset_count == controller_mode_reset_count) begin
+        while(!(inp_xfer.state inside {StStopped, StAborted}) &&
+              reset_count == controller_mode_reset_count) begin
           print_inp_xfer_state_changes(inp_xfer);
         end
       end

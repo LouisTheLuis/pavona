@@ -86,7 +86,7 @@ class i2c_host_mode_toggle_vseq extends i2c_base_vseq;
       // Wait for DUT to return to idle.
       csr_spinwait(ral.status.hostidle, 1'b1,
         .spinwait_delay_ns(( cfg.clk_rst_vif.clk_period_ps / 1000 ) * 10 /* 10 clk_i cycles*/),
-        .timeout_ns(10_000));
+        .timeout_ns(cfg.spinwait_timeout_ns));
 
       `uvm_info(`gfn, "DUT has returned to idle now.", UVM_LOW)
 
@@ -127,6 +127,10 @@ class i2c_host_mode_toggle_vseq extends i2c_base_vseq;
         num_runs == 3;
         num_wr_bytes == 15;
         num_rd_bytes == 15;)
+      seq.fixed_num_wr_bytes = 1'b1;
+      seq.fixed_num_rd_bytes = 1'b1;
+      seq.num_wr_bytes.rand_mode(0);
+      seq.num_rd_bytes.rand_mode(0);
       seq.start(p_sequencer);
     end
     `uvm_info(`gfn, "End i2c_host_mode_toggle_vseq", UVM_HIGH)
