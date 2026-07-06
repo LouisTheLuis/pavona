@@ -7,17 +7,17 @@ class chip_sw_random_power_glitch_vseq extends chip_sw_base_vseq;
 
   `uvm_object_new
 
-  // NumRound = 12 is the number of resets in this test. It consists of one PoR
-  // reset (1st one) + 11 random reset. 11 random resets are 10 sleep mode
-  // (light sleep and deep sleep) and one normal mode. The reset array rst_idx has
-  // 12 (NumRound) reset elements where 11 (NumRound-1) random reset sequence is
+  // NumRound = 6 is the number of resets in this test. It consists of one PoR
+  // reset (1st one) + 5 random reset. 5 random resets are 4 sleep mode
+  // (light sleep) and one normal mode. The reset array rst_idx has
+  // 6 (NumRound) reset elements where 5 (NumRound-1) random reset sequence is
   // ordered using a random variable assa. The last reset does not have to set the next reset type.
 
-  parameter int NumSleepType = 2;
+  parameter int NumSleepType = 1;
   // (key rst + pad rst) x 2 (normal sleep/deep sleep)
   parameter int NumPadRstEvent = 2 * NumSleepType;
-  // (sw_req + escalation rst + normal watchdog) x 2
-  parameter int NumWdogRstEvent = 3 * NumSleepType;
+  // (sw_req + normal watchdog) x 1
+  parameter int NumWdogRstEvent = 2 * NumSleepType;
   parameter int NumNormalMode = 1;
   parameter int NumRound = NumPadRstEvent + NumWdogRstEvent + NumNormalMode + 1;
 

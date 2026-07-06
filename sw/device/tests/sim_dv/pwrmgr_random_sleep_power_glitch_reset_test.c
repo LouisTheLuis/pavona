@@ -7,51 +7,75 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#if defined(OPENTITAN_IS_EGRET)
 #include "hw/top/dt/adc_ctrl.h"
+#endif
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/math.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_aon_timer.h"
+#if defined(OPENTITAN_IS_EGRET)
 #include "sw/device/lib/dif/dif_flash_ctrl.h"
+#endif
 #include "sw/device/lib/dif/dif_pinmux.h"
 #include "sw/device/lib/dif/dif_pwrmgr.h"
 #include "sw/device/lib/dif/dif_rstmgr.h"
 #include "sw/device/lib/dif/dif_rv_plic.h"
 #include "sw/device/lib/dif/dif_rv_timer.h"
+#if defined(OPENTITAN_IS_EGRET)
 #include "sw/device/lib/dif/dif_sysrst_ctrl.h"
+#endif
 #include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/alert_handler_testutils.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#if defined(OPENTITAN_IS_EGRET)
 #include "sw/device/lib/testing/flash_ctrl_testutils.h"
 #include "sw/device/lib/testing/nv_counter_testutils.h"
+#endif
 #include "sw/device/lib/testing/pwrmgr_testutils.h"
+#include "sw/device/lib/testing/ret_sram_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/rv_plic_testutils.h"
 #include "sw/device/lib/testing/test_framework/FreeRTOSConfig.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#if defined(OPENTITAN_IS_EGRET)
 #include "hw/top_egret/sw/autogen/top_egret.h"
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+#include "hw/top_dragonfly/sw/autogen/top_dragonfly.h"
+#endif
 
 OTTF_DEFINE_TEST_CONFIG();
+#if defined(OPENTITAN_IS_EGRET)
 static volatile const uint8_t RST_IDX[12] = {0, 1, 2, 3, 4,  5,
                                              6, 7, 8, 9, 10, 11};
+
 static const uint32_t kPlicTarget = kTopEgretPlicTargetIbex0;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+static volatile const uint8_t RST_IDX[6] = {0, 1, 2, 3, 4, 5};
+
+static const uint32_t kPlicTarget = kTopDragonflyPlicTargetIbex0;
+#endif
 
 /**
  * Objects to access the peripherals used in this test via dif API.
  */
+#if defined(OPENTITAN_IS_EGRET)
 static dif_flash_ctrl_state_t flash_ctrl;
+#endif
 static dif_rv_plic_t plic;
 static dif_alert_handler_t alert_handler;
 static dif_aon_timer_t aon_timer;
 static dif_pwrmgr_t pwrmgr;
 static dif_rstmgr_t rstmgr;
 
+#if defined(OPENTITAN_IS_EGRET)
 static const dt_adc_ctrl_t kAdcCtrlDt = 0;
 static_assert(kDtAdcCtrlCount == 1, "this test expects an adc_ctrl");
+#endif
 static const dt_rstmgr_t kRstmgrDt = 0;
 static_assert(kDtRstmgrCount == 1, "this test expects a rstmgr");
 static const dt_pwrmgr_t kPwrmgrDt = 0;
@@ -60,15 +84,19 @@ static const dt_aon_timer_t kAonTimerDt = 0;
 static_assert(kDtAonTimerCount == 1, "this test expects an aon_timer");
 static const dt_rv_plic_t kRvPlicDt = 0;
 static_assert(kDtRvPlicCount >= 1, "this test expects at least one rv_plic");
+#if defined(OPENTITAN_IS_EGRET)
 static const dt_flash_ctrl_t kFlashCtrlDt = 0;
 static_assert(kDtFlashCtrlCount >= 1,
               "this test expects at least one flash_ctrl");
+#endif
 static const dt_alert_handler_t kAlertHandlerDt = 0;
 static_assert(kDtAlertHandlerCount == 1,
               "this library expects exactly one alert_handler");
 
 dif_pwrmgr_request_sources_t aon_timer_wakeup_sources;
+#if defined(OPENTITAN_IS_EGRET)
 dif_pwrmgr_request_sources_t adc_ctrl_wakeup_sources;
+#endif
 dif_pwrmgr_request_sources_t all_wakeup_sources;
 dif_pwrmgr_request_sources_t wdog_reset_sources;
 
@@ -90,6 +118,17 @@ enum {
   kEscalationPhase2Micros = 50,                               // 50 us
 };
 
+#if defined(OPENTITAN_IS_DRAGONFLY)
+// NVM counters/fields to keep test steps between deep sleep modes
+enum {
+  // The counter ID for the non-volatile counter keeping the test steps.
+  kCounterEventIdx = 0
+};
+
+// To keep track of the test steps
+static uint32_t event_idx = 0;
+#endif
+
 static_assert(
     kWdogBarkMicros < kWdogBiteMicros &&
         kWdogBarkMicros > kEscalationPhase0Micros &&
@@ -105,13 +144,18 @@ static_assert(
  * overrides the default OTTF implementation.
  */
 void ottf_external_isr(uint32_t *exc_info) {
+#if defined(OPENTITAN_IS_EGRET)
   top_egret_plic_peripheral_t peripheral;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  top_dragonfly_plic_peripheral_t peripheral;
+#endif
   dif_rv_plic_irq_id_t irq_id;
   uint32_t irq = 0;
   uint32_t alert = 0;
 
   CHECK_DIF_OK(dif_rv_plic_irq_claim(&plic, kPlicTarget, &irq_id));
 
+#if defined(OPENTITAN_IS_EGRET)
   peripheral = (top_egret_plic_peripheral_t)
       top_egret_plic_interrupt_for_peripheral[irq_id];
 
@@ -133,7 +177,29 @@ void ottf_external_isr(uint32_t *exc_info) {
     irq = (dif_rv_plic_irq_id_t)(irq_id -
                                  (dif_rv_plic_irq_id_t)
                                      kTopEgretPlicIrqIdAlertHandlerClassa);
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  peripheral = (top_dragonfly_plic_peripheral_t)
+      top_dragonfly_plic_interrupt_for_peripheral[irq_id];
 
+  if (peripheral == kTopDragonflyPlicPeripheralAonTimerAon) {
+    irq =
+        (dif_aon_timer_irq_t)(irq_id -
+                              (dif_rv_plic_irq_id_t)
+                                  kTopDragonflyPlicIrqIdAonTimerAonWkupTimerExpired);
+
+    // Stops escalation process.
+    CHECK_DIF_OK(dif_alert_handler_escalation_clear(&alert_handler,
+                                                    kDifAlertHandlerClassA));
+    CHECK_DIF_OK(dif_aon_timer_irq_acknowledge(&aon_timer, irq));
+
+    CHECK(irq != kTopDragonflyPlicIrqIdAonTimerAonWdogTimerBark,
+          "AON Timer Wdog should not bark");
+
+  } else if (peripheral == kTopDragonflyPlicPeripheralAlertHandler) {
+    irq = (dif_rv_plic_irq_id_t)(irq_id -
+                                 (dif_rv_plic_irq_id_t)
+                                     kTopDragonflyPlicIrqIdAlertHandlerClassa);
+#endif
     CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(&alert_handler, alert));
 
     dif_alert_handler_class_state_t state;
@@ -166,23 +232,33 @@ void init_peripherals(void) {
       &pwrmgr, kDifPwrmgrReqTypeWakeup, dt_aon_timer_instance_id(kAonTimerDt),
       kDtAonTimerWakeupWkupReq, &aon_timer_wakeup_sources));
 
+#if defined(OPENTITAN_IS_EGRET)
   // Initialize flash_ctrl
   CHECK_DIF_OK(dif_flash_ctrl_init_state_from_dt(&flash_ctrl, kFlashCtrlDt));
+#endif
 
   // Initialize plic.
   CHECK_DIF_OK(dif_rv_plic_init_from_dt(kRvPlicDt, &plic));
 
+#if defined(OPENTITAN_IS_EGRET)
   rv_plic_testutils_irq_range_enable(
       &plic, kPlicTarget, kTopEgretPlicIrqIdAonTimerAonWkupTimerExpired,
       kTopEgretPlicIrqIdAonTimerAonWdogTimerBark);
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  rv_plic_testutils_irq_range_enable(
+      &plic, kPlicTarget, kTopDragonflyPlicIrqIdAonTimerAonWkupTimerExpired,
+      kTopDragonflyPlicIrqIdAonTimerAonWdogTimerBark);
+#endif
 
   // Initialize alert handler.
   CHECK_DIF_OK(dif_alert_handler_init_from_dt(kAlertHandlerDt, &alert_handler));
 
   // Other wakeups.
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_DIF_OK(dif_pwrmgr_find_request_source(
       &pwrmgr, kDifPwrmgrReqTypeWakeup, dt_adc_ctrl_instance_id(kAdcCtrlDt),
       kDtAdcCtrlWakeupWkupReq, &adc_ctrl_wakeup_sources));
+#endif
   CHECK_DIF_OK(dif_pwrmgr_find_request_source(
       &pwrmgr, kDifPwrmgrReqTypeReset, dt_aon_timer_instance_id(kDtAonTimerAon),
       kDtAonTimerResetReqAonTimer, &wdog_reset_sources));
@@ -196,7 +272,12 @@ void init_peripherals(void) {
  * wdog is programed to bark.
  */
 static void alert_handler_config(void) {
+#if defined(OPENTITAN_IS_EGRET)
   dif_alert_handler_alert_t alerts[] = {kTopEgretAlertIdPwrmgrAonFatalFault};
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  dif_alert_handler_alert_t alerts[] = {
+      kTopDragonflyAlertIdPwrmgrAonFatalFault};
+#endif
   dif_alert_handler_class_t alert_classes[] = {kDifAlertHandlerClassA};
 
   uint32_t cycles[3] = {0};
@@ -288,10 +369,16 @@ static void low_power_glitch_reset(const dif_pwrmgr_t *pwrmgr) {
 static void normal_sleep_glitch_reset(const dif_pwrmgr_t *pwrmgr) {
   // Place device into normal (shallow) power
   dif_pwrmgr_domain_config_t config;
+#if defined(OPENTITAN_IS_EGRET)
   config = kDifPwrmgrDomainOptionUsbClockInLowPower |
            kDifPwrmgrDomainOptionCoreClockInLowPower |
            kDifPwrmgrDomainOptionIoClockInLowPower |
            kDifPwrmgrDomainOptionMainPowerInLowPower;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  config = kDifPwrmgrDomainOptionCoreClockInLowPower |
+           kDifPwrmgrDomainOptionIoClockInLowPower |
+           kDifPwrmgrDomainOptionMainPowerInLowPower;
+#endif
   CHECK_STATUS_OK(pwrmgr_testutils_enable_low_power(
       pwrmgr, aon_timer_wakeup_sources, config));
   // Enter in low power mode.
@@ -341,8 +428,10 @@ static void sleep_wdog_bite_test(const dif_aon_timer_t *aon_timer,
 static void low_power_wdog(const dif_pwrmgr_t *pwrmgr) {
   // Program the pwrmgr to go to deep sleep state (clocks off).
   // Enter in low power mode.
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(
       pwrmgr_testutils_enable_low_power(pwrmgr, adc_ctrl_wakeup_sources, 0));
+#endif
   LOG_INFO("Low power set for watch dog");
   wait_for_interrupt();
   // If we arrive here the test must fail.
@@ -352,14 +441,25 @@ static void low_power_wdog(const dif_pwrmgr_t *pwrmgr) {
 static void normal_sleep_wdog(const dif_pwrmgr_t *pwrmgr) {
   // Place device into low power and immediately wake.
   dif_pwrmgr_domain_config_t config;
+#if defined(OPENTITAN_IS_EGRET)
   config = kDifPwrmgrDomainOptionUsbClockInLowPower |
            kDifPwrmgrDomainOptionCoreClockInLowPower |
            kDifPwrmgrDomainOptionIoClockInLowPower |
            kDifPwrmgrDomainOptionMainPowerInLowPower;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  config = kDifPwrmgrDomainOptionCoreClockInLowPower |
+           kDifPwrmgrDomainOptionIoClockInLowPower |
+           kDifPwrmgrDomainOptionMainPowerInLowPower;
+#endif
 
   // Enter in low power mode.
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(pwrmgr_testutils_enable_low_power(
       pwrmgr, adc_ctrl_wakeup_sources, config));
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  CHECK_STATUS_OK(
+      pwrmgr_testutils_enable_low_power(pwrmgr, wdog_reset_sources, config));
+#endif
   LOG_INFO("Normal sleep set for watchdog");
   wait_for_interrupt();
 }
@@ -385,10 +485,16 @@ static void normal_sleep_por(const dif_pwrmgr_t *pwrmgr) {
 
   // Place device into low power and immediately wake.
   dif_pwrmgr_domain_config_t config;
+#if defined(OPENTITAN_IS_EGRET)
   config = kDifPwrmgrDomainOptionUsbClockInLowPower |
            kDifPwrmgrDomainOptionCoreClockInLowPower |
            kDifPwrmgrDomainOptionIoClockInLowPower |
            kDifPwrmgrDomainOptionMainPowerInLowPower;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  config = kDifPwrmgrDomainOptionCoreClockInLowPower |
+           kDifPwrmgrDomainOptionIoClockInLowPower |
+           kDifPwrmgrDomainOptionMainPowerInLowPower;
+#endif
 
   // Program the pwrmgr to go to swallow sleep state (clocks on).
   CHECK_STATUS_OK(
@@ -402,15 +508,27 @@ bool test_main(void) {
   irq_global_ctrl(true);
   irq_external_ctrl(true);
 
+#if defined(OPENTITAN_IS_DRAGONFLY)
+  ret_sram_testutils_init();
+#endif
   init_peripherals();
 
   // Enable all the AON interrupts used in this test.
+#if defined(OPENTITAN_IS_EGRET)
   rv_plic_testutils_irq_range_enable(&plic, kPlicTarget,
                                      kTopEgretPlicIrqIdAlertHandlerClassa,
                                      kTopEgretPlicIrqIdAlertHandlerClassd);
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  rv_plic_testutils_irq_range_enable(&plic, kPlicTarget,
+                                     kTopDragonflyPlicIrqIdAlertHandlerClassa,
+                                     kTopDragonflyPlicIrqIdAlertHandlerClassd);
+#endif
 
   alert_handler_config();
 
+  // Egret still uses flash_ctrl as it is non-volatile and can be used to test
+  // with POR in the middle of the test, whereas retention SRAM cannot be
+#if defined(OPENTITAN_IS_EGRET)
   // First check the flash stored value
   uint32_t event_idx = 0;
   CHECK_STATUS_OK(flash_ctrl_testutils_counter_get(0, &event_idx));
@@ -430,6 +548,7 @@ bool test_main(void) {
 
   LOG_INFO("Test round %d", event_idx);
   LOG_INFO("RST_IDX[%d] = %d", event_idx, RST_IDX[event_idx]);
+#endif
 
   // Check if there was a HW reset caused by expected cases
   dif_rstmgr_reset_info_bitfield_t rst_info;
@@ -437,13 +556,35 @@ bool test_main(void) {
   rstmgr_testutils_reason_clear();
   LOG_INFO("reset info = %02X", rst_info);
 
+  // Dragonfly uses retention SRAM instead of flash_ctrl as it does not have
+  // flash. Retention SRAM will retain state between resets excluding POR.
+#if defined(OPENTITAN_IS_DRAGONFLY)
+  if (rst_info == kDifRstmgrResetInfoPor) {
+    CHECK_STATUS_OK(ret_sram_testutils_counter_clear(kCounterEventIdx));
+  }
+
+  // First check the ret_sram stored value
+  CHECK_STATUS_OK(ret_sram_testutils_counter_get(kCounterEventIdx, &event_idx));
+
+  // Increment ret_sram counter to know where we are
+  CHECK_STATUS_OK(ret_sram_testutils_counter_increment(kCounterEventIdx));
+
+  LOG_INFO("Test round %d", event_idx);
+  LOG_INFO("RST_IDX[%d] = %d", event_idx, RST_IDX[event_idx]);
+#endif
+
   CHECK(rst_info == kDifRstmgrResetInfoPor ||
+  // SysRstCtrl is not used in Dragonfly
+#if defined(OPENTITAN_IS_EGRET)
             rst_info == kDifRstmgrResetInfoSysRstCtrl ||
+#endif
             rst_info == kDifRstmgrResetInfoWatchdog ||
             rst_info == kDifRstmgrResetInfoEscalation ||
             rst_info == kDifRstmgrResetInfoLowPowerExit ||
+#if defined(OPENTITAN_IS_EGRET)
             rst_info == (kDifRstmgrResetInfoSysRstCtrl |
                          kDifRstmgrResetInfoLowPowerExit) ||
+#endif
             rst_info == (kDifRstmgrResetInfoPowerUnstable |
                          kDifRstmgrResetInfoLowPowerExit) ||
             rst_info == (kDifRstmgrResetInfoPowerUnstable |
@@ -461,6 +602,7 @@ bool test_main(void) {
             rst_info == kDifRstmgrResetInfoSw,
         "Wrong reset reason %02X", rst_info);
 
+#if defined(OPENTITAN_IS_EGRET)
   switch (RST_IDX[event_idx] / 2) {
     case 0:
       if (RST_IDX[event_idx] % 2) {
@@ -571,6 +713,69 @@ bool test_main(void) {
     default:
       LOG_INFO("Booting for undefined case");
   }
+// Dragonfly uses its own case block due to the absence of deep sleep and
+// non-volatile memory
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  switch (RST_IDX[event_idx]) {
+    case 0:
+      LOG_INFO("Booting and setting normal sleep followed by glitch reset");
+      LOG_INFO("Let SV wait timer reset");
+      normal_sleep_glitch_reset(&pwrmgr);
+      timer_on(kWdogBiteMicros);
+      break;
+
+    case 1:
+      LOG_INFO(
+          "Booting and setting normal sleep mode followed for low_power "
+          "entry reset");
+      LOG_INFO("Let SV wait timer reset");
+      // actually the same test as normal sleep + watchdog
+      CHECK_STATUS_OK(rstmgr_testutils_pre_reset(&rstmgr));
+      sleep_wdog_bite_test(&aon_timer, &pwrmgr, 200);
+      normal_sleep_wdog(&pwrmgr);
+      timer_on(kEscalationPhase0MicrosCpu);
+      break;
+
+    case 2:
+      LOG_INFO(
+          "Booting and setting normal sleep followed by watchdog reset "
+          "combined "
+          "with sw_req");
+      LOG_INFO("Let SV wait timer reset");
+      // Executing the wdog bite reset during sleep test.
+      CHECK_STATUS_OK(rstmgr_testutils_pre_reset(&rstmgr));
+      CHECK_DIF_OK(dif_rstmgr_software_device_reset(&rstmgr));
+      LOG_INFO("Device reset from sw");
+      sleep_wdog_bite_test(&aon_timer, &pwrmgr, 200);
+      normal_sleep_wdog(&pwrmgr);
+      timer_on(kEscalationPhase0MicrosCpu);
+      break;
+
+    case 3:
+      LOG_INFO("Booting and setting normal sleep followed by watchdog reset");
+      LOG_INFO("Let SV wait timer reset");
+      // Executing the wdog bite reset during sleep test.
+      CHECK_STATUS_OK(rstmgr_testutils_pre_reset(&rstmgr));
+      sleep_wdog_bite_test(&aon_timer, &pwrmgr, 200);
+      normal_sleep_wdog(&pwrmgr);
+      timer_on(kEscalationPhase0MicrosCpu);
+      break;
+
+    case 4:
+      LOG_INFO("Booting and running normal sleep followed by escalation reset");
+      config_escalate(&aon_timer, &pwrmgr);
+      timer_on(kEscalationPhase0MicrosCpu);
+      break;
+
+    case 5:
+      LOG_INFO("Last Booting");
+      return true;
+      break;
+
+    default:
+      LOG_INFO("Booting for undefined case");
+  }
+#endif
 
   return false;
 }
