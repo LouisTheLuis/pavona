@@ -3,8 +3,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("//rules/pavona:defs.bzl", "PAVONA_CPU", "pavona_test")
 load("//hw/top:defs.bzl", "pavona_select_top")
+load("//rules/pavona:defs.bzl", "PAVONA_CPU", "pavona_test")
 
 pavona_test(
     name = "i2c_host_tx_rx_test",
@@ -622,10 +622,13 @@ pavona_test(
 pavona_test(
     name = "sram_ctrl_execution_main_test",
     srcs = ["sram_ctrl_execution_main_test.c"],
-    exec_env = {"//hw/top_egret:sim_dv": None},
+    exec_env = {
+        "//hw/top_egret:sim_dv": None,
+        "//hw/top_dragonfly:sim_dv": None,
+    },
     deps = [
         "//hw/top:otp_ctrl_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
+        "//hw/top/dt",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:multibits",

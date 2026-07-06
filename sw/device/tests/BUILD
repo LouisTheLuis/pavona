@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
-load("//hw/top:defs.bzl", "pavona_select_top")
+load("//hw/top:defs.bzl", "pavona_if_ip", "pavona_select_top")
 load(
     "//rules:const.bzl",
     "CONST",
@@ -33,7 +33,6 @@ load(
     "verilator_params",
 )
 load("//rules/pavona:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
-load("//hw/top:defs.bzl", "pavona_if_ip")
 load("//rules/pavona:util.bzl", "flatten")
 
 package(default_visibility = ["//visibility:public"])

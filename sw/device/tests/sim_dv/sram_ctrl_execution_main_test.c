@@ -5,7 +5,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "hw/top/dt/lc_ctrl.h"
 #include "hw/top/dt/otp_ctrl.h"
+#include "hw/top/dt/sram_ctrl.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/multibits.h"
@@ -22,7 +24,6 @@
 #include "sw/device/lib/testing/test_framework/status.h"
 
 #include "hw/top/otp_ctrl_regs.h"  // Generated
-#include "hw/top_egret/sw/autogen/top_egret.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -34,13 +35,6 @@ static dif_sram_ctrl_t sram_ctrl;
  * as the main test flow.
  */
 static volatile bool exception_observed;
-
-/**
- * Main SRAM start and end addresses (inclusive).
- */
-static const uint32_t kRamStartAddr = TOP_EGRET_SRAM_CTRL_MAIN_RAM_BASE_ADDR;
-static const uint32_t kRamEndAddr = TOP_EGRET_SRAM_CTRL_MAIN_RAM_BASE_ADDR +
-                                    TOP_EGRET_SRAM_CTRL_MAIN_RAM_SIZE_BYTES - 1;
 
 /**
  * OTP HW partition relative IFETCH offset in bytes.
@@ -190,13 +184,16 @@ void do_execute_test(bool debug_func, bool ifetch_en) {
  */
 bool test_main(void) {
   uintptr_t func_address = (uintptr_t)execute_code_in_sram;
+  const uint32_t kRamStartAddr =
+      dt_sram_ctrl_memory_base(kDtSramCtrlMain, kDtSramCtrlMemoryRam);
+  const uint32_t kRamEndAddr =
+      kRamStartAddr +
+      dt_sram_ctrl_memory_size(kDtSramCtrlMain, kDtSramCtrlMemoryRam);
   CHECK(func_address >= kRamStartAddr && func_address <= kRamEndAddr,
         "Test code resides outside of the Main SRAM: function address = %x",
         func_address);
 
-  CHECK_DIF_OK(dif_sram_ctrl_init(
-      mmio_region_from_addr(TOP_EGRET_SRAM_CTRL_MAIN_REGS_BASE_ADDR),
-      &sram_ctrl));
+  CHECK_DIF_OK(dif_sram_ctrl_init_from_dt(kDtSramCtrlMain, &sram_ctrl));
 
   bool locked;
   CHECK_DIF_OK(
@@ -204,8 +201,7 @@ bool test_main(void) {
   CHECK(!locked, "Execution is disabled and locked, cannot perform the test");
 
   dif_lc_ctrl_t lc;
-  CHECK_DIF_OK(dif_lc_ctrl_init(
-      mmio_region_from_addr(TOP_EGRET_LC_CTRL_REGS_BASE_ADDR), &lc));
+  CHECK_DIF_OK(dif_lc_ctrl_init_from_dt(kDtLcCtrl, &lc));
 
   bool debug_func = false;
   CHECK_STATUS_OK(lc_ctrl_testutils_debug_func_enabled(&lc, &debug_func));
