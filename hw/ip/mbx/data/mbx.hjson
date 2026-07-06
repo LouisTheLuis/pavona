@@ -455,6 +455,7 @@
           name: "WDATA"
           items: "1"
           swaccess: "rw"
+          byte-write: "true"
           desc: '''DOE mailbox write data register.
                 The DOE instance receives data objects via writes to this register.
                 A successful write adds one DWORD to the data object being assembled in the DOE instance.
@@ -472,6 +473,7 @@
                 '''
           items: "1"
           swaccess: "rw"
+          byte-write: "true"
         }
       }
       { name: "SOC_DOE_INTR_MSG_ADDR"

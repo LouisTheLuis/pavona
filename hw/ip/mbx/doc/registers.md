@@ -426,7 +426,7 @@ A write of 1 to the DOE Go bit in the DOE Control Register marks the completion 
 - Word Aligned Offset Range: `0x10`to`0x10`
 - Size (words): `1`
 - Access: `rw`
-- Byte writes are *not* supported.
+- Byte writes are  supported.
 
 ## RDATA
 DOE mailbox read data register
@@ -438,7 +438,7 @@ If Data Object Ready bit is clear, writes of any value to this register must hav
 - Word Aligned Offset Range: `0x14`to`0x14`
 - Size (words): `1`
 - Access: `rw`
-- Byte writes are *not* supported.
+- Byte writes are  supported.
 
 ## SOC_DOE_INTR_MSG_ADDR
 Utilized by the mailbox responder to send an interrupt message to the requester via a write to the configured address.

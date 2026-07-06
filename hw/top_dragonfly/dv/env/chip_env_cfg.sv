@@ -167,9 +167,17 @@ class chip_env_cfg #(type RAL_T = chip_ral_pkg::chip_reg_block) extends cip_base
     soc_mbx_base_reg_block = ral_models["chip_soc_mbx_reg_block"];
     `downcast(chip_soc_mbx_ral, soc_mbx_base_reg_block);
 
-    // Set the a_source width limitation for the TL agent hooked up to the CPU cored port.
-    // TODO: use a parameter (or some better way)?
-    m_tl_agent_cfg.valid_a_source_width = 6;
+    // The LC_CTRL DMI aperture is modeled as a RAL memory, but it routes to the LC_CTRL register
+    // block. Byte-mask errors are therefore register dependent, rather than a blanket window-level
+    // TL error. Do not let generic TL error tests target it as a no-partial-write memory.
+    chip_soc_dbg_ral.lc_ctrl_dmi.dmi.set_mem_partial_write_support(1);
+
+    // Set the a_source width limitation for all chip-level TL agents.
+    // The deepest CTN path traverses xbar_main.u_sm1_54, soc_proxy.u_ctn_egress_mux, and
+    // chip_dragonfly_asic.u_ctn_sm1, which together reserve 5 bits for host tagging.
+    foreach (m_tl_agent_cfgs[ral_name]) begin
+      m_tl_agent_cfgs[ral_name].valid_a_source_width = 3;
+    end
 
     // create uart agent config obj
     foreach (m_uart_agent_cfgs[i]) begin
