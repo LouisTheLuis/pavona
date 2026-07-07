@@ -65,8 +65,8 @@ static void config_wdog(const dif_aon_timer_t *aon_timer,
 static void wdog_bite_test(const dif_aon_timer_t *aon_timer,
                            const dif_pwrmgr_t *pwrmgr, uint32_t aon_cycles) {
   uint32_t bark_time_us;
-  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(aon_cycles,
-                                                             &bark_time_us));
+  CHECK_STATUS_OK(
+      aon_timer_testutils_get_us_from_aon_cycles(aon_cycles, &bark_time_us));
   LOG_INFO("bark_time_us = %d", bark_time_us);
   uint32_t bite_time_us = bark_time_us * 2;
   config_wdog(aon_timer, pwrmgr, bark_time_us, bite_time_us);
@@ -74,8 +74,8 @@ static void wdog_bite_test(const dif_aon_timer_t *aon_timer,
   // The `intr_state` takes 3 aon clock cycles to rise plus 2 extra cycles as a
   // precaution.
   uint32_t extra_time_us;
-  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(3 + 2,
-                                                             &extra_time_us));
+  CHECK_STATUS_OK(
+      aon_timer_testutils_get_us_from_aon_cycles(3 + 2, &extra_time_us));
   uint32_t wait_us = bark_time_us + extra_time_us;
   LOG_INFO("wait_us = %d", wait_us);
   // Wait bark time and check that the bark interrupt requested.
