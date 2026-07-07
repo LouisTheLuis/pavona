@@ -7,8 +7,8 @@ class chip_sw_uart_tx_rx_vseq extends chip_sw_uart_smoke_vseq;
 
   `uvm_object_new
 
-  localparam uint UART_DATASET_SIZE = 128;
-  localparam uint UART_RX_FIFO_SIZE = 128;
+  localparam uint UART_DATASET_SIZE = 64;
+  localparam uint UART_RX_FIFO_SIZE = 64;
 
   // A set of bytes expected to be received on TX.
   rand bit [7:0] exp_uart_tx_data[];
@@ -40,7 +40,7 @@ class chip_sw_uart_tx_rx_vseq extends chip_sw_uart_smoke_vseq;
     super.cpu_init();
     sw_symbol_backdoor_overwrite("kUartTxData", exp_uart_tx_data);
     sw_symbol_backdoor_overwrite("kExpUartRxData", uart_rx_data);
-    sw_symbol_backdoor_overwrite("kUartIdx", uart_idx_data);
+    sw_symbol_backdoor_overwrite("kUartIdxDv", uart_idx_data);
   endtask
 
   virtual task body();

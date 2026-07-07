@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 `define CALC_NCO(baud_rate, nco_width, clk_freq_khz) \
-  (baud_rate == BaudRate1p5Mbps && clk_freq_khz == 24_000) ? 16'hffff : \
+  (baud_rate == BaudRate1p5Mbps && clk_freq_khz == 250_000) ? 16'hffff : \
       (longint'(baud_rate) * (2**(nco_width+4))) / (clk_freq_khz * 1000)
 
 class chip_sw_uart_rand_baudrate_vseq extends chip_sw_uart_tx_rx_vseq;
@@ -34,8 +34,8 @@ class chip_sw_uart_rand_baudrate_vseq extends chip_sw_uart_tx_rx_vseq;
         uart_clk_freq_khz = uart_clk_freq_khz * 2;  // div2
       end
     end else begin
-      // internal uart bus clock is 24Mhz
-      uart_clk_freq_khz = 24_000;
+      // internal uart bus clock is 250Mhz based on Dragonfly peripheral clock domain
+      uart_clk_freq_khz = 250_000;
     end
   endfunction
 

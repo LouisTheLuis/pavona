@@ -7376,6 +7376,7 @@ pavona_test(
     broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
         EGRET_TEST_ENVS,
+        DRAGONFLY_TEST_ENVS,
         #EGRET_CW340_TEST_ENVS,
         EGRET_SILICON_OWNER_ROM_EXT_ENVS,
         {

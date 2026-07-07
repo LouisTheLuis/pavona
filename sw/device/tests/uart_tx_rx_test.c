@@ -31,7 +31,7 @@ static dif_pinmux_t pinmux;
 static dif_rv_plic_t plic;
 static dif_uart_t uart;
 
-static_assert(kDtUartCount >= 2, "This test needs at least 2 UART instance");
+static_assert(kDtUartCount >= 1, "This test needs at least 1 UART instance");
 
 /**
  * UART TX RX test
@@ -512,24 +512,34 @@ bool test_main(void) {
   uart_dt = (dt_uart_t)kUartIdx;
 
   // If we're testing UART0 we need to move the console to UART1.
+  // TODO: Move OTTF console to SPI if there is only 1 UART.
+#if defined(OPENTITAN_IS_EGRET)
   if (kUartIdx == 0 && kDeviceType != kDeviceSimDV) {
     CHECK_STATUS_OK(
         uart_testutils_select_pinmux(&pinmux, 1, kUartPinmuxChannelConsole));
     ottf_console_configure_uart(ottf_console_get(),
                                 dt_uart_primary_reg_block(kDtUart1));
   }
+#endif
 
   LOG_INFO("Test UART%d", kUartIdx);
 
   // Attach the UART under test.
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(
       uart_testutils_select_pinmux(&pinmux, kUartIdx, kUartPinmuxChannelDut));
+#endif
 
   if (kUseExtClk) {
     config_external_clock(&clkmgr);
   }
+
+  // The clkmgr testutils library does not support an external clock for
+  // Dragonfly
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(clkmgr_testutils_enable_clock_counts_with_expected_thresholds(
       &clkmgr, /*jitter_enabled=*/false, kUseExtClk, kUseLowSpeedSel));
+#endif
 
   // Initialize the UART.
   uart_init_with_irqs(uart_dt, &uart, (uint32_t)uartBaudrate,
@@ -544,7 +554,9 @@ bool test_main(void) {
 
   // Execute the test.
   execute_test(&uart);
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(clkmgr_testutils_check_measurement_counts(&clkmgr));
+#endif
 
   return true;
 }
