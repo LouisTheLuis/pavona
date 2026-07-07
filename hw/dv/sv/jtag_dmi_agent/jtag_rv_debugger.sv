@@ -1033,7 +1033,7 @@ class jtag_rv_debugger extends uvm_object;
           `BUSYWAIT_AND_EXIT_ON_ERR
           if (!cfg.in_reset) begin
             csr_rd(.ptr(ral.sbdata0), .value(rdata), .blocking(1));
-            req.rdata[0] = rdata;
+            req.rdata.push_back(rdata);
           end
         end
         2'b10, 2'b11: begin
@@ -1061,7 +1061,7 @@ class jtag_rv_debugger extends uvm_object;
             end
             if (!cfg.in_reset) begin
               csr_rd(.ptr(ral.sbdata0), .value(rdata));
-              req.rdata[i] = rdata;
+              req.rdata.push_back(rdata);
             end
           end
         end

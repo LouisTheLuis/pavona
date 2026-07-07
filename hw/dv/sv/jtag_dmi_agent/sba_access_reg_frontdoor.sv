@@ -38,7 +38,7 @@ class sba_access_reg_frontdoor extends uvm_reg_frontdoor;
         data = get_csr_val_with_updated_field(csr_or_fld.field, `gmv(csr_or_fld.csr),
                                               rw_info.value[0]);
       end
-      sba_item.wdata[0] = data;
+      sba_item.wdata.push_back(data);
     end else begin
       sba_item.bus_op = BusOpRead;
       sba_item.readonaddr = 1;
