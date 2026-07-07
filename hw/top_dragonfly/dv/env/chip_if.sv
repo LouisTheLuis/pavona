@@ -918,8 +918,12 @@ interface chip_if;
 
   // Signal probe function for peripheral to DIO in pinmux.
   wire [UVM_HDL_MAX_WIDTH-1:0] dio_to_periph = `PINMUX_HIER.dio_to_periph_o;
-  `DV_CREATE_SIGNAL_PROBE_FUNCTION(signal_probe_pinmux_periph_to_dio_i_11_0,
-      `PINMUX_HIER.periph_to_dio_i[11:0])
+  // We cannot force bits 42:57 since they are inputs. So we split the probe functions into two.
+  // TODO: Find a more elegant solution for this.
+  `DV_CREATE_SIGNAL_PROBE_FUNCTION(signal_probe_pinmux_periph_to_dio_i_41_0,
+      `PINMUX_HIER.periph_to_dio_i[41:0])
+  `DV_CREATE_SIGNAL_PROBE_FUNCTION(signal_probe_pinmux_periph_to_dio_i_72_58,
+      `PINMUX_HIER.periph_to_dio_i[72:58])
 
   // Signal probe function for peripheral to DIO output enable in pinmux.
   `DV_CREATE_SIGNAL_PROBE_FUNCTION(signal_probe_pinmux_periph_to_dio_oe_i,

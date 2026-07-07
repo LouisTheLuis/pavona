@@ -97,79 +97,79 @@ package chip_common_pkg;
   // This maps the DIO on the pinmux / peripheral side to the DIO on the pad side, both of
   // which have different enum numbering in top_dragonfly_pkg.sv.
   parameter top_dragonfly_pkg::dio_pad_e DioToDioPadMap [top_dragonfly_pkg::DioCount] = '{
-    top_dragonfly_pkg::DioPadSpiHostD0,
-    top_dragonfly_pkg::DioPadSpiHostD1,
-    top_dragonfly_pkg::DioPadSpiHostD2,
-    top_dragonfly_pkg::DioPadSpiHostD3,
-    top_dragonfly_pkg::DioPadSpiHostClk,
-    top_dragonfly_pkg::DioPadSpiHostCsL,
-    top_dragonfly_pkg::DioPadSpiDevD0,
-    top_dragonfly_pkg::DioPadSpiDevD1,
-    top_dragonfly_pkg::DioPadSpiDevD2,
-    top_dragonfly_pkg::DioPadSpiDevD3,
-    top_dragonfly_pkg::DioPadSpiDevClk,
-    top_dragonfly_pkg::DioPadSpiDevCsL,
-    top_dragonfly_pkg::DioPadSpiDevTpmCsL,
-    top_dragonfly_pkg::DioPadUartRx,
-    top_dragonfly_pkg::DioPadUartTx,
-    top_dragonfly_pkg::DioPadI2cScl,
-    top_dragonfly_pkg::DioPadI2cSda,
-    top_dragonfly_pkg::DioPadGpio0,
-    top_dragonfly_pkg::DioPadGpio1,
-    top_dragonfly_pkg::DioPadGpio2,
-    top_dragonfly_pkg::DioPadGpio3,
-    top_dragonfly_pkg::DioPadGpio4,
-    top_dragonfly_pkg::DioPadGpio5,
-    top_dragonfly_pkg::DioPadGpio6,
-    top_dragonfly_pkg::DioPadGpio7,
-    top_dragonfly_pkg::DioPadGpio8,
-    top_dragonfly_pkg::DioPadGpio9,
-    top_dragonfly_pkg::DioPadGpio10,
-    top_dragonfly_pkg::DioPadGpio11,
-    top_dragonfly_pkg::DioPadGpio12,
-    top_dragonfly_pkg::DioPadGpio13,
-    top_dragonfly_pkg::DioPadGpio14,
-    top_dragonfly_pkg::DioPadGpio15,
-    top_dragonfly_pkg::DioPadGpio16,
-    top_dragonfly_pkg::DioPadGpio17,
-    top_dragonfly_pkg::DioPadGpio18,
-    top_dragonfly_pkg::DioPadGpio19,
-    top_dragonfly_pkg::DioPadGpio20,
-    top_dragonfly_pkg::DioPadGpio21,
-    top_dragonfly_pkg::DioPadGpio22,
-    top_dragonfly_pkg::DioPadGpio23,
-    top_dragonfly_pkg::DioPadGpio24,
-    top_dragonfly_pkg::DioPadGpio25,
-    top_dragonfly_pkg::DioPadGpio26,
-    top_dragonfly_pkg::DioPadGpio27,
-    top_dragonfly_pkg::DioPadGpio28,
-    top_dragonfly_pkg::DioPadGpio29,
-    top_dragonfly_pkg::DioPadGpio30,
-    top_dragonfly_pkg::DioPadGpio31,
-    top_dragonfly_pkg::DioPadSocGpi0,
-    top_dragonfly_pkg::DioPadSocGpi1,
-    top_dragonfly_pkg::DioPadSocGpi2,
-    top_dragonfly_pkg::DioPadSocGpi3,
-    top_dragonfly_pkg::DioPadSocGpi4,
-    top_dragonfly_pkg::DioPadSocGpi5,
-    top_dragonfly_pkg::DioPadSocGpi6,
-    top_dragonfly_pkg::DioPadSocGpi7,
-    top_dragonfly_pkg::DioPadSocGpi8,
-    top_dragonfly_pkg::DioPadSocGpi9,
-    top_dragonfly_pkg::DioPadSocGpi10,
-    top_dragonfly_pkg::DioPadSocGpi11,
-    top_dragonfly_pkg::DioPadSocGpo0,
-    top_dragonfly_pkg::DioPadSocGpo1,
-    top_dragonfly_pkg::DioPadSocGpo2,
-    top_dragonfly_pkg::DioPadSocGpo3,
-    top_dragonfly_pkg::DioPadSocGpo4,
-    top_dragonfly_pkg::DioPadSocGpo5,
-    top_dragonfly_pkg::DioPadSocGpo6,
-    top_dragonfly_pkg::DioPadSocGpo7,
-    top_dragonfly_pkg::DioPadSocGpo8,
-    top_dragonfly_pkg::DioPadSocGpo9,
-    top_dragonfly_pkg::DioPadSocGpo10,
-    top_dragonfly_pkg::DioPadSocGpo11
+    top_dragonfly_pkg::DioPadSpiHostD0,    /* DioSpiHost0Sd0 */
+    top_dragonfly_pkg::DioPadSpiHostD1,    /* DioSpiHost0Sd1 */
+    top_dragonfly_pkg::DioPadSpiHostD2,    /* DioSpiHost0Sd2 */
+    top_dragonfly_pkg::DioPadSpiHostD3,    /* DioSpiHost0Sd3 */
+    top_dragonfly_pkg::DioPadSpiDevD0,     /* DioSpiDeviceSd0 */
+    top_dragonfly_pkg::DioPadSpiDevD1,     /* DioSpiDeviceSd1 */
+    top_dragonfly_pkg::DioPadSpiDevD2,     /* DioSpiDeviceSd2 */
+    top_dragonfly_pkg::DioPadSpiDevD3,     /* DioSpiDeviceSd3 */
+    top_dragonfly_pkg::DioPadI2cScl,       /* DioI2c0Scl */
+    top_dragonfly_pkg::DioPadI2cSda,       /* DioI2c0Sda */
+    top_dragonfly_pkg::DioPadGpio0,        /* DioGpioGpio0 */
+    top_dragonfly_pkg::DioPadGpio1,        /* DioGpioGpio1 */
+    top_dragonfly_pkg::DioPadGpio2,        /* DioGpioGpio2 */
+    top_dragonfly_pkg::DioPadGpio3,        /* DioGpioGpio3 */
+    top_dragonfly_pkg::DioPadGpio4,        /* DioGpioGpio4 */
+    top_dragonfly_pkg::DioPadGpio5,        /* DioGpioGpio5 */
+    top_dragonfly_pkg::DioPadGpio6,        /* DioGpioGpio6 */
+    top_dragonfly_pkg::DioPadGpio7,        /* DioGpioGpio7 */
+    top_dragonfly_pkg::DioPadGpio8,        /* DioGpioGpio8 */
+    top_dragonfly_pkg::DioPadGpio9,        /* DioGpioGpio9 */
+    top_dragonfly_pkg::DioPadGpio10,       /* DioGpioGpio10 */
+    top_dragonfly_pkg::DioPadGpio11,       /* DioGpioGpio11 */
+    top_dragonfly_pkg::DioPadGpio12,       /* DioGpioGpio12 */
+    top_dragonfly_pkg::DioPadGpio13,       /* DioGpioGpio13 */
+    top_dragonfly_pkg::DioPadGpio14,       /* DioGpioGpio14 */
+    top_dragonfly_pkg::DioPadGpio15,       /* DioGpioGpio15 */
+    top_dragonfly_pkg::DioPadGpio16,       /* DioGpioGpio16 */
+    top_dragonfly_pkg::DioPadGpio17,       /* DioGpioGpio17 */
+    top_dragonfly_pkg::DioPadGpio18,       /* DioGpioGpio18 */
+    top_dragonfly_pkg::DioPadGpio19,       /* DioGpioGpio19 */
+    top_dragonfly_pkg::DioPadGpio20,       /* DioGpioGpio20 */
+    top_dragonfly_pkg::DioPadGpio21,       /* DioGpioGpio21 */
+    top_dragonfly_pkg::DioPadGpio22,       /* DioGpioGpio22 */
+    top_dragonfly_pkg::DioPadGpio23,       /* DioGpioGpio23 */
+    top_dragonfly_pkg::DioPadGpio24,       /* DioGpioGpio24 */
+    top_dragonfly_pkg::DioPadGpio25,       /* DioGpioGpio25 */
+    top_dragonfly_pkg::DioPadGpio26,       /* DioGpioGpio26 */
+    top_dragonfly_pkg::DioPadGpio27,       /* DioGpioGpio27 */
+    top_dragonfly_pkg::DioPadGpio28,       /* DioGpioGpio28 */
+    top_dragonfly_pkg::DioPadGpio29,       /* DioGpioGpio29 */
+    top_dragonfly_pkg::DioPadGpio30,       /* DioGpioGpio30 */
+    top_dragonfly_pkg::DioPadGpio31,       /* DioGpioGpio31 */
+    top_dragonfly_pkg::DioPadSpiDevClk,    /* DioSpiDeviceSck */
+    top_dragonfly_pkg::DioPadSpiDevCsL,    /* DioSpiDeviceCsb */
+    top_dragonfly_pkg::DioPadSpiDevTpmCsL, /* DioSpiDeviceTpmCsb */
+    top_dragonfly_pkg::DioPadUartRx,       /* DioUart0Rx */
+    top_dragonfly_pkg::DioPadSocGpi0,      /* DioSocProxySocGpi0 */
+    top_dragonfly_pkg::DioPadSocGpi1,      /* DioSocProxySocGpi1 */
+    top_dragonfly_pkg::DioPadSocGpi2,      /* DioSocProxySocGpi2 */
+    top_dragonfly_pkg::DioPadSocGpi3,      /* DioSocProxySocGpi3 */
+    top_dragonfly_pkg::DioPadSocGpi4,      /* DioSocProxySocGpi4 */
+    top_dragonfly_pkg::DioPadSocGpi5,      /* DioSocProxySocGpi5 */
+    top_dragonfly_pkg::DioPadSocGpi6,      /* DioSocProxySocGpi6 */
+    top_dragonfly_pkg::DioPadSocGpi7,      /* DioSocProxySocGpi7 */
+    top_dragonfly_pkg::DioPadSocGpi8,      /* DioSocProxySocGpi8 */
+    top_dragonfly_pkg::DioPadSocGpi9,      /* DioSocProxySocGpi9 */
+    top_dragonfly_pkg::DioPadSocGpi10,     /* DioSocProxySocGpi10 */
+    top_dragonfly_pkg::DioPadSocGpi11,     /* DioSocProxySocGpi11 */
+    top_dragonfly_pkg::DioPadSpiHostClk,   /* DioSpiHost0Sck */
+    top_dragonfly_pkg::DioPadSpiHostCsL,   /* DioSpiHost0Csb */
+    top_dragonfly_pkg::DioPadUartTx,       /* DioUart0Tx */
+    top_dragonfly_pkg::DioPadSocGpo0,      /* DioSocProxySocGpo0 */
+    top_dragonfly_pkg::DioPadSocGpo1,      /* DioSocProxySocGpo1 */
+    top_dragonfly_pkg::DioPadSocGpo2,      /* DioSocProxySocGpo2 */
+    top_dragonfly_pkg::DioPadSocGpo3,      /* DioSocProxySocGpo3 */
+    top_dragonfly_pkg::DioPadSocGpo4,      /* DioSocProxySocGpo4 */
+    top_dragonfly_pkg::DioPadSocGpo5,      /* DioSocProxySocGpo5 */
+    top_dragonfly_pkg::DioPadSocGpo6,      /* DioSocProxySocGpo6 */
+    top_dragonfly_pkg::DioPadSocGpo7,      /* DioSocProxySocGpo7 */
+    top_dragonfly_pkg::DioPadSocGpo8,      /* DioSocProxySocGpo8 */
+    top_dragonfly_pkg::DioPadSocGpo9,      /* DioSocProxySocGpo9 */
+    top_dragonfly_pkg::DioPadSocGpo10,     /* DioSocProxySocGpo10 */
+    top_dragonfly_pkg::DioPadSocGpo11      /* DioSocProxySocGpo11 */
   };
 
   typedef struct packed {

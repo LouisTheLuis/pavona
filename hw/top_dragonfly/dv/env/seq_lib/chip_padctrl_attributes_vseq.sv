@@ -27,18 +27,11 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
     prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_D1
     prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_D2
     prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_D3
-    prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_CLK
-    prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_CS_L
     prim_pad_wrapper_pkg::BidirStd, // SPI_DEV_D0
     prim_pad_wrapper_pkg::BidirStd, // SPI_DEV_D1
     prim_pad_wrapper_pkg::BidirStd, // SPI_DEV_D2
     prim_pad_wrapper_pkg::BidirStd, // SPI_DEV_D3
-    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_CLK
-    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_CS_L
-    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_TPM_CS_L
-    prim_pad_wrapper_pkg::InputStd, // UART_RX
-    prim_pad_wrapper_pkg::BidirStd, // UART_TX
-    prim_pad_wrapper_pkg::InputStd, // I2C_SCL
+    prim_pad_wrapper_pkg::BidirStd, // I2C_SCL
     prim_pad_wrapper_pkg::BidirStd, // I2C_SDA
     prim_pad_wrapper_pkg::BidirStd, // GPIO0
     prim_pad_wrapper_pkg::BidirStd, // GPIO1
@@ -72,6 +65,10 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
     prim_pad_wrapper_pkg::BidirStd, // GPIO29
     prim_pad_wrapper_pkg::BidirStd, // GPIO30
     prim_pad_wrapper_pkg::BidirStd, // GPIO31
+    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_CLK
+    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_CS_L
+    prim_pad_wrapper_pkg::InputStd, // SPI_DEV_TPM_CS_L
+    prim_pad_wrapper_pkg::InputStd, // UART_RX
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI0
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI1
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI2
@@ -84,6 +81,9 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI9
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI10
     prim_pad_wrapper_pkg::InputStd, // SOC_GPI11
+    prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_CLK
+    prim_pad_wrapper_pkg::BidirStd, // SPI_HOST_CS_L
+    prim_pad_wrapper_pkg::BidirStd, // UART_TX
     prim_pad_wrapper_pkg::BidirStd, // SOC_GPO0
     prim_pad_wrapper_pkg::BidirStd, // SOC_GPO1
     prim_pad_wrapper_pkg::BidirStd, // SOC_GPO2
@@ -140,9 +140,11 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
   }
 
   constraint periph_to_mio_pad_map_c {
-    unique {periph_to_mio_map};
     foreach (periph_to_mio_map[i]) {
       periph_to_mio_map[i] != MioOutCount;
+    }
+    if (MioOutCount >= MioPadCount) {
+      unique {periph_to_mio_map};
     }
   }
 
@@ -273,7 +275,8 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
     void'(cfg.chip_vif.signal_probe_pinmux_periph_to_mio_oe_i(SignalProbeRelease));
     void'(cfg.chip_vif.signal_probe_pinmux_periph_to_mio_i(SignalProbeRelease));
     void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_oe_i(SignalProbeRelease));
-    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_11_0(SignalProbeRelease));
+    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_41_0(SignalProbeRelease));
+    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_72_58(SignalProbeRelease));
     cfg.chip_vif.mios_if.disconnect();
 
     // Reset the DUT before reenabling the assertions.
@@ -578,8 +581,10 @@ class chip_padctrl_attributes_vseq extends chip_stub_cpu_base_vseq;
 
   function void pinmux_dio_drive_inputs();
     cfg.chip_vif.dios_if.pins_oe = '0;
-    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_11_0(SignalProbeForce,
-                                                                periph_to_dio[11:0]));
+    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_41_0(SignalProbeForce,
+                                                                periph_to_dio[41:0]));
+    void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_i_72_58(SignalProbeForce,
+                                                                 periph_to_dio[72:58]));
     void'(cfg.chip_vif.signal_probe_pinmux_periph_to_dio_oe_i(SignalProbeForce, periph_to_dio_oe));
     for (int i = 0; i < DioCount; i++) begin
       cfg.chip_vif.dios_if.pins_oe[DioToDioPadMap[i]] = dio_to_periph_oe[i];
