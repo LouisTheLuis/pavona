@@ -37,6 +37,11 @@ class chip_prim_tl_access_vseq extends chip_stub_cpu_base_vseq;
     backdoor_override_otp();
   endfunction
 
+  virtual function void initialize_otp_lc_state();
+    initialize_otp_sig_verify();
+    super.initialize_otp_lc_state();
+  endfunction
+
   function response_mode_e get_response_mode(bit using_prims);
     // If the CPU is disabled, the lc gate will respond with all zeros.
     if (cfg.chip_vif.get_lc_ctrl_enable_signal(LcCtrlSignalCpuEn) != lc_ctrl_pkg::On) begin

@@ -203,6 +203,7 @@ class chip_base_vseq #(
     //   otp_clear_secret3_partition(cfg.mem_bkdr_util_h[Otp]);
     // end
 
+    initialize_otp_lc_state();
     initialize_otp_creator_sw_cfg_ast_cfg();
     // Initialize selected memories to all 0. This is required for some chip-level tests such as
     // acc_mem_scramble that may intentionally read memories before writing them. Reading these
@@ -344,6 +345,11 @@ class chip_base_vseq #(
           SignalProbeForce, 16'h3F));
     end
   endtask : alert_ping_en_shorten
+
+  // OTP life cycle initialization placeholder. Used by tests that intentionally override the
+  // life cycle state after the base OTP image is loaded.
+  virtual function void initialize_otp_lc_state();
+  endfunction
 
   // Initialize the OTP creator SW cfg region with AST configuration data.
   virtual function void initialize_otp_creator_sw_cfg_ast_cfg();
