@@ -18,7 +18,11 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/lib/testing/test_framework/status.h"
 
+#if defined(OPENTITAN_IS_EGRET)
 #include "hw/top_egret/sw/autogen/top_egret.h"
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+#include "hw/top_dragonfly/sw/autogen/top_dragonfly.h"
+#endif
 #include "sw/device/lib/testing/autogen/isr_testutils.h"
 
 // TODO #14111, remove it once pinout configuration is provided
@@ -78,32 +82,47 @@ enum {
 };
 
 typedef struct i2c_conf {
-  const int unsigned base_addr;
+  const dt_i2c_t base_addr;
   const uint32_t i2c_irq_fmt_threshold_id;
+#if defined(OPENTITAN_IS_EGRET)
   const top_egret_plic_irq_id_t plic_irqs[kNumI2cIrqs];
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  const top_dragonfly_plic_irq_id_t plic_irqs[kNumI2cIrqs];
+#endif
 } i2c_conf_t;
 
+#if defined(OPENTITAN_IS_EGRET)
 const i2c_conf_t i2c_configuration[] = {
-    {.base_addr = TOP_EGRET_I2C0_BASE_ADDR,
+    {.base_addr = kDtI2c0,
      .i2c_irq_fmt_threshold_id = kTopEgretPlicIrqIdI2c0FmtThreshold,
      .plic_irqs = {kTopEgretPlicIrqIdI2c0CmdComplete,
                    kTopEgretPlicIrqIdI2c0TxStretch,
                    kTopEgretPlicIrqIdI2c0AcqStretch,
                    kTopEgretPlicIrqIdI2c0UnexpStop,
                    kTopEgretPlicIrqIdI2c0HostTimeout}},
-    {.base_addr = TOP_EGRET_I2C1_BASE_ADDR,
+    {.base_addr = kDtI2c1,
      .i2c_irq_fmt_threshold_id = kTopEgretPlicIrqIdI2c1FmtThreshold,
      .plic_irqs = {kTopEgretPlicIrqIdI2c1CmdComplete,
                    kTopEgretPlicIrqIdI2c1TxStretch,
                    kTopEgretPlicIrqIdI2c1AcqStretch,
                    kTopEgretPlicIrqIdI2c1UnexpStop,
                    kTopEgretPlicIrqIdI2c1HostTimeout}},
-    {.base_addr = TOP_EGRET_I2C2_BASE_ADDR,
+    {.base_addr = kDtI2c2,
      .i2c_irq_fmt_threshold_id = kTopEgretPlicIrqIdI2c2FmtThreshold,
      .plic_irqs = {
          kTopEgretPlicIrqIdI2c2CmdComplete, kTopEgretPlicIrqIdI2c2TxStretch,
          kTopEgretPlicIrqIdI2c2AcqStretch, kTopEgretPlicIrqIdI2c2UnexpStop,
          kTopEgretPlicIrqIdI2c2HostTimeout}}};
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+const i2c_conf_t i2c_configuration[] = {
+    {.base_addr = kDtI2c0,
+     .i2c_irq_fmt_threshold_id = kTopDragonflyPlicIrqIdI2c0FmtThreshold,
+     .plic_irqs = {kTopDragonflyPlicIrqIdI2c0CmdComplete,
+                   kTopDragonflyPlicIrqIdI2c0TxStretch,
+                   kTopDragonflyPlicIrqIdI2c0AcqStretch,
+                   kTopDragonflyPlicIrqIdI2c0UnexpStop,
+                   kTopDragonflyPlicIrqIdI2c0HostTimeout}}};
+#endif
 
 /**
  * Provides external irq handling for this test.
@@ -111,8 +130,13 @@ const i2c_conf_t i2c_configuration[] = {
  * This function overrides the default OTTF external ISR.
  */
 void ottf_external_isr(uint32_t *exc_info) {
+#if defined(OPENTITAN_IS_EGRET)
   plic_isr_ctx_t plic_ctx = {.rv_plic = &plic,
                              .hart_id = kTopEgretPlicTargetIbex0};
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  plic_isr_ctx_t plic_ctx = {.rv_plic = &plic,
+                             .hart_id = kTopDragonflyPlicTargetIbex0};
+#endif
 
   i2c_isr_ctx_t i2c_ctx = {
       .i2c = &i2c,
@@ -121,7 +145,11 @@ void ottf_external_isr(uint32_t *exc_info) {
       .expected_irq = 0,
       .is_only_irq = false};
 
+#if defined(OPENTITAN_IS_EGRET)
   top_egret_plic_peripheral_t peripheral;
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+  top_dragonfly_plic_peripheral_t peripheral;
+#endif
   dif_i2c_irq_t i2c_irq;
   isr_testutils_i2c_isr(plic_ctx, i2c_ctx, false, &peripheral, &i2c_irq);
 
@@ -155,24 +183,28 @@ bool test_main(void) {
         kI2cByteCount, I2C_PARAM_FIFO_DEPTH);
   }
 
-  CHECK_DIF_OK(dif_i2c_init(
-      mmio_region_from_addr(i2c_configuration[kI2cIdx].base_addr), &i2c));
+  CHECK_DIF_OK(
+      dif_i2c_init_from_dt(i2c_configuration[kI2cIdx].base_addr, &i2c));
+  CHECK_DIF_OK(dif_pinmux_init_from_dt(kDtPinmuxAon, &pinmux));
+  CHECK_DIF_OK(dif_rv_plic_init_from_dt(kDtRvPlic, &plic));
 
-  CHECK_DIF_OK(dif_pinmux_init(
-      mmio_region_from_addr(TOP_EGRET_PINMUX_AON_BASE_ADDR), &pinmux));
-
-  CHECK_DIF_OK(dif_rv_plic_init(
-      mmio_region_from_addr(TOP_EGRET_RV_PLIC_BASE_ADDR), &plic));
-
+#if defined(OPENTITAN_IS_EGRET)
   CHECK_STATUS_OK(
       i2c_testutils_select_pinmux(&pinmux, kI2cIdx, I2cPinmuxPlatformIdDvsim));
+#endif
 
   // Enable functional interrupts as well as error interrupts to make sure
   // everything is behaving as expected.
   for (uint32_t i = 0; i < kNumI2cIrqs; ++i) {
+#if defined(OPENTITAN_IS_EGRET)
     CHECK_DIF_OK(dif_rv_plic_irq_set_enabled(
         &plic, i2c_configuration[kI2cIdx].plic_irqs[i],
         kTopEgretPlicTargetIbex0, kDifToggleEnabled));
+#elif defined(OPENTITAN_IS_DRAGONFLY)
+    CHECK_DIF_OK(dif_rv_plic_irq_set_enabled(
+        &plic, i2c_configuration[kI2cIdx].plic_irqs[i],
+        kTopDragonflyPlicTargetIbex0, kDifToggleEnabled));
+#endif
 
     // Assign a default priority
     CHECK_DIF_OK(dif_rv_plic_irq_set_priority(

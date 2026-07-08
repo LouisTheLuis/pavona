@@ -9,11 +9,14 @@ load("//hw/top:defs.bzl", "pavona_select_top")
 pavona_test(
     name = "i2c_host_tx_rx_test",
     srcs = ["i2c_host_tx_rx_test.c"],
-    exec_env = {"//hw/top_egret:sim_dv": None},
+    exec_env = {
+        "//hw/top_egret:sim_dv": None,
+        "//hw/top_dragonfly:sim_dv": None,
+    },
     deps = [
         "//hw/top:clkmgr_c_regs",
         "//hw/top:lc_ctrl_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
+        "//hw/top/dt",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:i2c",
         "//sw/device/lib/dif:pinmux",
@@ -25,17 +28,26 @@ pavona_test(
         "//sw/device/lib/testing:isr_testutils",
         "//sw/device/lib/testing:rand_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
+    ] + pavona_select_top(
+        {
+            "egret": ["//hw/top_egret/sw/autogen:top_egret"],
+            "dragonfly": ["//hw/top_dragonfly/sw/autogen:top_dragonfly"],
+        },
+        [],
+    ),
 )
 
 pavona_test(
     name = "i2c_device_tx_rx_test",
     srcs = ["i2c_device_tx_rx_test.c"],
-    exec_env = {"//hw/top_egret:sim_dv": None},
+    exec_env = {
+        "//hw/top_egret:sim_dv": None,
+        "//hw/top_dragonfly:sim_dv": None,
+    },
     deps = [
         "//hw/top:clkmgr_c_regs",
         "//hw/top:lc_ctrl_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
+        "//hw/top/dt",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:i2c",
         "//sw/device/lib/dif:pinmux",
@@ -47,7 +59,13 @@ pavona_test(
         "//sw/device/lib/testing:isr_testutils",
         "//sw/device/lib/testing:rand_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
+    ] + pavona_select_top(
+        {
+            "egret": ["//hw/top_egret/sw/autogen:top_egret"],
+            "dragonfly": ["//hw/top_dragonfly/sw/autogen:top_dragonfly"],
+        },
+        [],
+    ),
 )
 
 pavona_test(
