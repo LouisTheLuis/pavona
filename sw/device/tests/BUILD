@@ -2662,6 +2662,27 @@ pavona_test(
 )
 
 pavona_test(
+    name = "keymgr_dpe_sideload_kmac_test",
+    srcs = ["keymgr_dpe_sideload_kmac_test.c"],
+    exec_env = DRAGONFLY_TEST_ENVS,
+    verilator = verilator_params(timeout = "long"),
+    deps = [
+        "//hw/top:keymgr_dpe_c_regs",
+        "//hw/top:kmac_c_regs",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/dif:keymgr_dpe",
+        "//sw/device/lib/dif:kmac",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/runtime:print",
+        "//sw/device/lib/testing:keymgr_dpe_testutils",
+        "//sw/device/lib/testing:kmac_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+pavona_test(
     name = "keymgr_sideload_acc_test",
     srcs = ["keymgr_sideload_acc_test.c"],
     exec_env = dicts.add(

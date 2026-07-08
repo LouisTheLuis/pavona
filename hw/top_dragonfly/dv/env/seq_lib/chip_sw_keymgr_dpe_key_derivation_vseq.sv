@@ -64,6 +64,11 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
     end
   endtask
 
+  // Give subclasses access to chip_sw_base_vseq's body()
+  virtual task base_body();
+    super.body();
+  endtask
+
   virtual task body();
     key_shares_t stage_0_key, stage_1_key, stage_2_key, stage_3_key;
 
