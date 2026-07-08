@@ -12,6 +12,26 @@
 #include "sw/device/lib/dif/autogen/dif_keymgr_dpe_autogen.h"
 
 /**
+ * Make sure dif_keymgr_dpe_sideload_clr_t enum is in sync with autogenarated
+ * values.
+ */
+static_assert(
+    kDifKeymgrDpeSideloadClearNone == KEYMGR_DPE_SIDELOAD_CLEAR_VAL_VALUE_NONE,
+    "kDifKeymgrDpeSideloadClearNone must match the register definition!");
+static_assert(
+    kDifKeymgrDpeSideloadClearAes == KEYMGR_DPE_SIDELOAD_CLEAR_VAL_VALUE_AES,
+    "kDifKeymgrDpeSideloadClearAes must match the register definition!");
+static_assert(
+    kDifKeymgrDpeSideloadClearKmac == KEYMGR_DPE_SIDELOAD_CLEAR_VAL_VALUE_KMAC,
+    "kDifKeymgrDpeSideloadClearKmac must match the register definition!");
+static_assert(
+    kDifKeymgrDpeSideloadClearAcc == KEYMGR_DPE_SIDELOAD_CLEAR_VAL_VALUE_ACC,
+    "kDifKeymgrDpeSideloadClearAcc must match the register definition!");
+static_assert(kDifKeymgrDpeSideloadClearAll ==
+                  KEYMGR_DPE_SIDELOAD_CLEAR_VAL_MASK,
+              "kDifKeymgrDpeSideloadClearAll must match the register mask!");
+
+/**
  * Address spaces of SW_BINDING_N, SALT_N, SW_SHARE0_OUTPUT_N, and
  * SW_SHARE1_OUTPUT_N registers must be contiguous to be able to use
  * `mmio_region_memcpy_to/from_mmio32()`.
@@ -320,6 +340,35 @@ dif_result_t dif_keymgr_dpe_generate(
   // Start the operation
   mmio_region_write32(keymgr_dpe->base_addr, KEYMGR_DPE_START_REG_OFFSET,
                       1 << KEYMGR_DPE_START_EN_BIT);
+
+  return kDifOk;
+}
+
+dif_result_t dif_keymgr_dpe_sideload_clear_set_enabled(
+    const dif_keymgr_dpe_t *keymgr_dpe, dif_toggle_t state) {
+  if (keymgr_dpe == NULL || !dif_is_valid_toggle(state)) {
+    return kDifBadArg;
+  }
+
+  dif_keymgr_dpe_sideload_clr_t val = state == kDifToggleEnabled
+                                          ? kDifKeymgrDpeSideloadClearAll
+                                          : kDifKeymgrDpeSideloadClearNone;
+
+  mmio_region_write32(keymgr_dpe->base_addr,
+                      KEYMGR_DPE_SIDELOAD_CLEAR_REG_OFFSET, val);
+
+  return kDifOk;
+}
+
+dif_result_t dif_keymgr_dpe_sideload_clear_get_enabled(
+    const dif_keymgr_dpe_t *keymgr_dpe, dif_toggle_t *state) {
+  if (keymgr_dpe == NULL || state == NULL) {
+    return kDifBadArg;
+  }
+
+  uint32_t reg_val = mmio_region_read32(keymgr_dpe->base_addr,
+                                        KEYMGR_DPE_SIDELOAD_CLEAR_REG_OFFSET);
+  *state = dif_bool_to_toggle(reg_val == kDifKeymgrDpeSideloadClearAll);
 
   return kDifOk;
 }

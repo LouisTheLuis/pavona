@@ -24,6 +24,20 @@ extern "C" {
 #endif  // __cplusplus
 
 /**
+ * Enumeration for side load slot clearing.
+ */
+typedef enum dif_keymgr_dpe_sideload_clr {
+  kDifKeymgrDpeSideloadClearNone = 0,
+  kDifKeymgrDpeSideloadClearAes = 1,
+  kDifKeymgrDpeSideloadClearKmac = 2,
+  kDifKeymgrDpeSideloadClearAcc = 3,
+  // Using different value than those enumerated above should clear all slots,
+  // so we can use the mask value of this field to denote ALL case. This was
+  // we can statically assert this value on the .c side of this DIF.
+  kDifKeymgrDpeSideloadClearAll = 7,
+} dif_keymgr_dpe_sideload_clr_t;
+
+/**
  * SW-visible key manager DPE states.
  *
  * Key manager RTL has more than 4 finite state machine (FSM) states, but it
@@ -263,6 +277,34 @@ OT_WARN_UNUSED_RESULT
 dif_result_t dif_keymgr_dpe_generate(
     const dif_keymgr_dpe_t *keymgr_dpe,
     const dif_keymgr_dpe_generate_params_t *params);
+
+/**
+ * Starts or stops clearing of sideload keys.
+ *
+ * When a key is generated to be sideloaded to a hardware peripheral, key
+ * manager stores it in a set of storage registers. Calling this function with
+ * `state` set to `kDifToggleEnabled` causes key manager to clear sideload
+ * keys continously using random values from the entropty source. Callers must
+ * disable clearing of sideload keys to resume normal sideload operation.
+ *
+ * @param keymgr_dpe A key manager handle.
+ * @param state The new toggle state for sideload clear.
+ * @return The result of the operation.
+ */
+OT_WARN_UNUSED_RESULT
+dif_result_t dif_keymgr_dpe_sideload_clear_set_enabled(
+    const dif_keymgr_dpe_t *keymgr_dpe, dif_toggle_t state);
+
+/**
+ * Checks whether clearing of sideload keys is enabled or not.
+ *
+ * @param keymgr_dpe A key manager handle.
+ * @param[out] Out-param for the current toggle state of sideload clear.
+ * @return The result of the operation.
+ */
+OT_WARN_UNUSED_RESULT
+dif_result_t dif_keymgr_dpe_sideload_clear_get_enabled(
+    const dif_keymgr_dpe_t *keymgr_dpe, dif_toggle_t *state);
 
 /**
  * Gets the operational status of keymgr_dpe.
