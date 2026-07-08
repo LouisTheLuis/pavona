@@ -36,6 +36,83 @@ class chip_common_vseq extends chip_stub_cpu_base_vseq;
     run_common_vseq_wrapper(num_trans);
   endtask : body
 
+  virtual function void apply_chip_csr_exclusions();
+    csr_excl_item csr_excl;
+
+    if (cfg.ral_models.exists("chip_reg_block")) begin
+      csr_excl = cfg.ral_models["chip_reg_block"].get_excl_item();
+      `DV_CHECK_NE_FATAL(csr_excl, null)
+
+      // These trace CSRs are driven by soc_dbg_ctrl hardware policy state. Chip-level init and
+      // generic CSR tests can legitimately observe values different from the static RAL reset.
+      csr_excl.add_excl("chip_reg_block.soc_dbg_ctrl_core.trace_debug_policy_category",
+                        CsrExclCheck, CsrAllTests);
+      csr_excl.add_excl("chip_reg_block.soc_dbg_ctrl_core.trace_debug_policy_valid_relocked",
+                        CsrExclCheck, CsrAllTests);
+
+      // GPIO direct output/OE CSRs are hwext/hrw and connected to live chip IO state. Random
+      // chip-level CSR writes can make their readback differ from the RAL mirror and can also
+      // affect pad drive behavior, so skip them in non-init CSR stress tests.
+      csr_excl.add_excl("chip_reg_block.gpio.direct_out", CsrExclAll, CsrNonInitTests);
+      csr_excl.add_excl("chip_reg_block.gpio.direct_oe", CsrExclAll, CsrNonInitTests);
+
+      // GPIO input period counters observe live GPIO inputs. Their control registers contain
+      // fields that hardware can clear or reject while a measurement is active, and their value
+      // registers are hardware-written read-clear CSRs. Generic outstanding CSR traffic cannot
+      // rely on stable RAL mirror readback for these registers.
+      for (int i = 0; i < 8; i++) begin
+        csr_excl.add_excl($sformatf("chip_reg_block.gpio.inp_prd_cnt_ctrl_%0d", i),
+                          CsrExclAll, CsrNonInitTests);
+        csr_excl.add_excl($sformatf("chip_reg_block.gpio.inp_prd_cnt_val_%0d", i),
+                          CsrExclAll, CsrNonInitTests);
+      end
+    end
+
+    if (cfg.ral_models.exists("chip_soc_dbg_reg_block")) begin
+      csr_excl = cfg.ral_models["chip_soc_dbg_reg_block"].get_excl_item();
+      `DV_CHECK_NE_FATAL(csr_excl, null)
+
+      csr_excl.add_excl(
+          "chip_soc_dbg_reg_block.soc_dbg_ctrl_jtag.jtag_trace_debug_policy_category",
+          CsrExclCheck, CsrAllTests);
+      csr_excl.add_excl(
+          "chip_soc_dbg_reg_block.soc_dbg_ctrl_jtag.jtag_trace_debug_policy_valid_relocked",
+          CsrExclCheck, CsrAllTests);
+      csr_excl.add_excl("chip_soc_dbg_reg_block.soc_dbg_ctrl_jtag.jtag_boot_status",
+                        CsrExclCheck, CsrAllTests);
+    end
+
+    apply_racl_policy_csr_exclusions("chip_reg_block");
+    apply_racl_policy_csr_exclusions("chip_soc_mbx_reg_block");
+  endfunction
+
+  virtual function void apply_racl_policy_csr_exclusions(string ral_model_name);
+    csr_excl_item csr_excl;
+    string prefix;
+
+    if (!cfg.ral_models.exists(ral_model_name)) return;
+
+    csr_excl = cfg.ral_models[ral_model_name].get_excl_item();
+    `DV_CHECK_NE_FATAL(csr_excl, null)
+
+    prefix = {ral_model_name, "."};
+
+    // These registers define RACL policy for later TL accesses. Random generic CSR writes can
+    // intentionally revoke permissions, making subsequent accesses return TL d_error.
+    csr_excl.add_excl({prefix, "racl_ctrl.policy_all_rd_wr_shadowed"},
+                      CsrExclWrite, CsrAllTests);
+    csr_excl.add_excl({prefix, "racl_ctrl.policy_rot_private_shadowed"},
+                      CsrExclWrite, CsrAllTests);
+    csr_excl.add_excl({prefix, "racl_ctrl.policy_soc_rot_shadowed"},
+                      CsrExclWrite, CsrAllTests);
+
+    for (int i = 0; i < 32; i++) begin
+      csr_excl.add_excl($sformatf("%0sac_range_check.range_racl_policy_shadowed_%0d",
+                                  prefix, i),
+                        CsrExclWrite, CsrAllTests);
+    end
+  endfunction
+
   virtual task pre_start();
     // CSR tests write to chip CSRs, which includes the pinmux registers. Random writes to the
     // pinmux may inadvertently connect the chip IOs to peripherals, causing Xs to propagate, if
@@ -46,6 +123,8 @@ class chip_common_vseq extends chip_stub_cpu_base_vseq;
 
     // Automated csr tests will cover the chip_soc_mbx_ral, so connect it
     cfg.chip_vif.connect_mbx_if();
+
+    apply_chip_csr_exclusions();
 
     super.pre_start();
   endtask

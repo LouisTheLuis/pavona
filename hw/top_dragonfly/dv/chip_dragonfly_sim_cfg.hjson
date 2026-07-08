@@ -421,24 +421,31 @@
     {
       // Reused from hw/dv/tools/dvsim/tests/csr_tests.hjson.
       name: "chip_csr_bit_bash"
+      uvm_test_seq: "chip_common_vseq"
+      build_mode: "cover_reg_top"
       // Don't test over 200 randomly picked CSRs at a time.
-      run_opts: ["+test_timeout_ns=120_000_000", "+num_test_csrs=200"]
+      run_opts: ["+csr_bit_bash", "+en_scb=0", "+test_timeout_ns=120_000_000", "+num_test_csrs=200"]
       run_timeout_mins: 180
-      en_run_modes: ["sw_test_mode_test_rom"]
+      en_run_modes: ["csr_tests_mode"]
     }
     {
       // Reused from hw/dv/tools/dvsim/tests/csr_tests.hjson.
       name: "chip_csr_aliasing"
+      uvm_test_seq: "chip_common_vseq"
+      build_mode: "cover_reg_top"
       run_timeout_mins: 180
-      run_opts: ["+test_timeout_ns=120_000_000"]
-      en_run_modes: ["sw_test_mode_test_rom"]
+      // Don't test over 200 randomly picked CSRs at a time.
+      run_opts: ["+csr_aliasing", "+en_scb=0", "+test_timeout_ns=120_000_000", "+num_test_csrs=200"]
+      en_run_modes: ["csr_tests_mode"]
     }
     {
       // Reused from hw/dv/tools/dvsim/tests/csr_tests.hjson.
       name: "chip_same_csr_outstanding"
+      uvm_test_seq: "chip_common_vseq"
+      build_mode: "cover_reg_top"
       run_timeout_mins: 120
-      run_opts: ["+test_timeout_ns=120_000_000"]
-      en_run_modes: ["sw_test_mode_test_rom"]
+      run_opts: ["+run_same_csr_outstanding", "+en_scb=0", "+test_timeout_ns=120_000_000"]
+      en_run_modes: ["csr_tests_mode"]
     }
     {
       name: chip_sw_example_rom
