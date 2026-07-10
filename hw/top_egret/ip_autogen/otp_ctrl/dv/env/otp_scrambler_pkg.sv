@@ -69,12 +69,19 @@ package otp_scrambler_pkg;
   endfunction
 
   function automatic bit [SCRAMBLE_DATA_SIZE-1:0] cal_digest(int part_idx,
-                                                             ref bit [BUS_DW-1:0] mem_q[$]);
-    int array_size = mem_q.size();
+                                                             bit [BUS_DW-1:0] mem_q[$]);
+    int array_size;
     real key_factor  = SCRAMBLE_KEY_SIZE / BUS_DW;
     bit [SCRAMBLE_DATA_SIZE-1:0] init_vec = RndCnstDigestIV[0];
     bit [SCRAMBLE_DATA_SIZE-1:0] enc_data;
     bit [SCRAMBLE_DATA_SIZE-1:0] digest;
+
+    // Ensure that the data to be hashed is a multiple of 64-bit; append a zero if necessary.
+    if (mem_q.size() % 2 != 0) begin
+        mem_q.push_back(0);
+    end
+
+    array_size = mem_q.size();
 
     for (int i = 0; i < $ceil(array_size / key_factor); i++) begin
       bit [SCRAMBLE_DATA_SIZE-1:0] input_data = (i == 0) ? init_vec : digest;
