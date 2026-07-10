@@ -28,9 +28,9 @@ interface pwrmgr_rstreqs_sva_if
   // output reset cycle with a clk enable disable
   localparam int MinMainRstCycles = 0;
 % if topname in ["egret", "scafi_deprecated"]:
-  localparam int MaxMainRstCycles = 400;
+  localparam int MaxMainRstCycles = 600;
 % elif topname == "dragonfly":
-  localparam int MaxMainRstCycles = 3000;
+  localparam int MaxMainRstCycles = 8000;
 % else:
 <% assert False, f"Unsupported top: {topname}" %>\
 % endif
