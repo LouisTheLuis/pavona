@@ -63,8 +63,10 @@ static bool otp_ifetch_enabled(void) {
   };
   CHECK_DIF_OK(dif_otp_ctrl_configure(&otp, config));
 
+  // The bit-masking here is to accomodate that the field may not be 32-bit
+  // aligned; cf. the .index field below.
   CHECK_DIF_OK(dif_otp_ctrl_dai_read_start(&otp, kOtpPartitionHwCfg1,
-                                           kOtpIfetchHwRelativeOffset));
+                                           kOtpIfetchHwRelativeOffset & ~3U));
 
   CHECK_STATUS_OK(otp_ctrl_testutils_wait_for_dai(&otp));
 
@@ -72,8 +74,10 @@ static bool otp_ifetch_enabled(void) {
   CHECK_DIF_OK(dif_otp_ctrl_dai_read32_end(&otp, &value));
 
   return bitfield_field32_read(
-             value, (bitfield_field32_t){.mask = 0xff, .index = 0}) ==
-         kMultiBitBool8True;
+             value, (bitfield_field32_t){
+                        .mask = 0xff,
+                        .index = 8 * (kOtpIfetchHwRelativeOffset & 3U),
+                    }) == kMultiBitBool8True;
 }
 
 /**
