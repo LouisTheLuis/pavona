@@ -285,10 +285,18 @@ class BadDeepLoop(SnippetGen):
         if fat_count < insns_needed:
             return None
 
+        # Create a deep copy of the model and program rather than modify
+        # the objects in place in the recursive _gen_loop_stack().
+        model_copy = model.copy()
+        program_copy = program.copy()
+
         # At this point, we *should* be able to make the loop unconditionally.
-        snippet, new_model = self._gen_loop_stack(model, program)
+        snippet, new_model = self._gen_loop_stack(model_copy, program_copy)
         if new_model is None:
             return None
+
+        # If we have succeeded in producing a bad loop update the program and model.
+        program = program_copy
         model = new_model
 
         # Required to prevent assembly gen build error due to IMEM size increase.
