@@ -133,6 +133,11 @@ class kmac_base_vseq extends cip_base_vseq #(
 
   bit do_kmac_init = 1'b1;
 
+  // constrain the message to always have a size greater than 0
+  constraint msg_size_c {
+    msg.size() > 0;
+  }
+
   // constrain xof_en to 0 if not in kmac mode
   constraint xof_en_c {
     (!kmac_en) -> (xof_en == 1'b0);
