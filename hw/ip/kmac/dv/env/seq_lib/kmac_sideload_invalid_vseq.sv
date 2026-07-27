@@ -69,6 +69,8 @@ class kmac_sideload_invalid_vseq extends kmac_long_msg_and_output_vseq;
   task send_kmac_req();
     // Send KMAC app requests or SW commands to the IP block. When we are done,
     // use the kmac_done variable to flag it to the inject_error task.
+    bit [TL_DW-1:0] status_data;
+
     if (en_app) begin
       send_kmac_app_req(app_mode);
 
@@ -86,10 +88,16 @@ class kmac_sideload_invalid_vseq extends kmac_long_msg_and_output_vseq;
       read_regwen_and_rand_write_locked_regs();
 
       // Write the message into msgfifo.
-      write_msg(msg, .blocking(0), .wait_for_fifo_has_capacity(0));
+      // The injected error and invalidated key may cause KMAC to indicate it has finished
+      // before the entire message has been sent. Prevent writing to the intr_state register
+      // until the end of this sequence.
+      write_msg(msg, .blocking(0), .wait_for_fifo_has_capacity(0), .clear_state(0));
 
       right_encode(xof_en ? 0 : output_len * 8, output_len_enc);
-      write_msg(output_len_enc, .blocking(0), .wait_for_fifo_has_capacity(0));
+      // The injected error and invalidated key may cause KMAC to indicate it has finished
+      // before the entire message has been sent. Prevent writing to the intr_state register
+      // until the end of this sequence.
+      write_msg(output_len_enc, .blocking(0), .wait_for_fifo_has_capacity(0), .clear_state(0));
 
       // Wait for some cycles after writing message to let internal state settle.
       cfg.clk_rst_vif.wait_clks($urandom_range(5, 10));
@@ -101,6 +109,10 @@ class kmac_sideload_invalid_vseq extends kmac_long_msg_and_output_vseq;
       csr_spinwait(.ptr(ral.intr_state.kmac_done), .exp_data(1'b1));
       // When we are done, there is no point to invalidate the key.
       kmac_done = 1;
+
+      // Clear the internal rw1c kmac_done register now that it has been acknowledged
+      csr_rd(.ptr(ral.intr_state), .value(status_data));
+      csr_wr(.ptr(ral.intr_state), .value(status_data));
 
       read_regwen_and_rand_write_locked_regs();
     end

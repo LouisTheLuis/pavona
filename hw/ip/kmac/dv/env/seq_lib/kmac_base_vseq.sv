@@ -364,13 +364,17 @@ class kmac_base_vseq extends cip_base_vseq #(
   endtask
 
   // This task reads out the STATUS and INTR_STATE csrs so scb can check the status
-  virtual task check_state();
+  virtual task check_state(bit clear_state = 1'b1);
     bit [TL_DW-1:0] data;
 
     csr_rd(.ptr(ral.status), .value(data));
 
     csr_rd(.ptr(ral.intr_state), .value(data));
-    csr_wr(.ptr(ral.intr_state), .value(data));
+
+    // Writing will clear the rw1c done register which may be used for timing in other sequences
+    if (clear_state) begin
+      csr_wr(.ptr(ral.intr_state), .value(data));
+    end
   endtask
 
   virtual task check_err(bit clear_err = 1'b1);
@@ -627,7 +631,8 @@ class kmac_base_vseq extends cip_base_vseq #(
   //   to correctly align the final address and data size
   virtual task write_msg(bit [7:0] msg_arr[],
                          bit blocking = $urandom_range(0, 1),
-                         bit wait_for_fifo_has_capacity = 1);
+                         bit wait_for_fifo_has_capacity = 1,
+                         bit clear_state = 1'b1);
 
     bit [TL_DW-1:0] data_word;
     bit [7:0] msg_q[$];
@@ -697,7 +702,7 @@ class kmac_base_vseq extends cip_base_vseq #(
     // wait for all msgfifo accesses to complete
     wait_no_outstanding_access();
     // read out status/intr_state CSRs to check
-    check_state();
+    check_state(clear_state);
   endtask
 
   // This task burst writes 32-bit chunks of the message into the msgfifo
