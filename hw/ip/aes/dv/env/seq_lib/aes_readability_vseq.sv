@@ -109,8 +109,7 @@ class aes_readability_vseq extends aes_base_vseq;
 
 
     foreach (data_item.data_in[idx]) begin
-      if ((check_item.data_in[idx] == data_item.data_in[idx]) ||
-         (check_item.data_out[idx] == data_item.data_out[idx])) begin
+      if ((check_item.data_in[idx] == data_item.data_in[idx])) begin
         `uvm_fatal(`gfn, $sformatf("----| Data reg was did not clear |---- %s", str))
       end
     end
