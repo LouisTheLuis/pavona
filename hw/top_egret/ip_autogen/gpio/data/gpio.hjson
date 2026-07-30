@@ -116,8 +116,7 @@
     }
     {
       name: "GPIO.OUT.MASK"
-      desc: '''Masked output access enables to modify either upper or lower 16bits of output register  without a Read-Modify-Write.
-      '''
+      desc: 'Masked output access enables to modify either upper or lower 16bits of output register  without a Read-Modify-Write.'
     }
   ]
   inter_signal_list: [
