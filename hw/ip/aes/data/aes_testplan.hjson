@@ -88,7 +88,7 @@
       stage: V2
       tests: ["aes_config_error", "aes_alert_reset", "aes_man_cfg_err"]
       features: []
-    }    
+    }
     {
       name: trigger_clear_test
       desc: '''
