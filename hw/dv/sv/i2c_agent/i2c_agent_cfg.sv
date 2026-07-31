@@ -33,6 +33,12 @@ class i2c_agent_cfg extends dv_base_agent_cfg;
   // TODO(#23920) Remove this.
   bit     got_stop = 0;
 
+  // Build-time compatibility policy for the legacy block-level timing
+  // reprogramming handshake above. Reset-safe environments disable this so
+  // monitor progress never depends on a sequence writing runtime state into
+  // cfg. This is configuration, not reset-epoch state.
+  bit     use_legacy_got_stop_handshake = 1'b1;
+
   int     rcvd_rd_byte = 0; // Increment each time the agent reads a byte.
 
   // this variables can be configured from host test
@@ -82,6 +88,7 @@ class i2c_agent_cfg extends dv_base_agent_cfg;
 
   `uvm_object_utils_begin(i2c_agent_cfg)
     `uvm_field_int(en_monitor,                                UVM_DEFAULT)
+    `uvm_field_int(use_legacy_got_stop_handshake,             UVM_DEFAULT)
     `uvm_field_enum(i2c_target_addr_mode_e, target_addr_mode, UVM_DEFAULT)
     `uvm_field_int(timing_cfg.tSetupStart,                    UVM_DEFAULT)
     `uvm_field_int(timing_cfg.tHoldStart,                     UVM_DEFAULT)

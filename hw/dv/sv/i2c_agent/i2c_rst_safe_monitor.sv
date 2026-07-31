@@ -147,8 +147,11 @@ class i2c_rst_safe_monitor extends dv_rst_safe_base_monitor #(
 
   virtual protected task target_collect_thread();
 
-    // Wait for the driver/vseq to clear this at the start of the next stimulus round.
-    wait(cfg.got_stop == 0);
+    // Legacy block-level sequences use cfg.got_stop to hold monitoring while
+    // they reprogram timing. Reset-safe paths use fixed timing and must not
+    // exchange runtime state through cfg, so they proceed directly to
+    // publishing the next in-progress transfer.
+    if (cfg.use_legacy_got_stop_handshake) wait(cfg.got_stop == 0);
 
     `uvm_create_obj(i2c_item, mon_dut_item);
 
@@ -200,8 +203,10 @@ class i2c_rst_safe_monitor extends dv_rst_safe_base_monitor #(
 
     mon_dut_item.state = i2c_agent_pkg::StStopped;
 
-    // If the previous transfer ended via STOP (as opposed to RSTART), signal this to the driver.
-    if (mon_dut_item.stop) cfg.got_stop = 1;
+    // Preserve the legacy sequence/monitor handshake only for legacy users.
+    // TODO(#23920): Remove cfg.got_stop when all users own this synchronization
+    // inside components rather than exchanging runtime state through cfg.
+    if (cfg.use_legacy_got_stop_handshake && mon_dut_item.stop) cfg.got_stop = 1;
 
     // The transfer has ended. Send the completed item to the scoreboard.
     begin
@@ -370,8 +375,9 @@ class i2c_rst_safe_monitor extends dv_rst_safe_base_monitor #(
   //
   virtual protected task controller_collect_thread();
 
-    // Wait for the driver/vseq to clear this at the start of the next stimulus round.
-    wait(cfg.got_stop == 0);
+    // See target_collect_thread(): reset-safe monitoring is continuous across
+    // STOP boundaries and does not wait for runtime cfg state from a sequence.
+    if (cfg.use_legacy_got_stop_handshake) wait(cfg.got_stop == 0);
 
     `uvm_create_obj(i2c_item, mon_dut_item);
 
@@ -429,8 +435,8 @@ class i2c_rst_safe_monitor extends dv_rst_safe_base_monitor #(
 
     mon_dut_item.state = i2c_agent_pkg::StStopped;
 
-    // If the previous transfer ended via STOP (as opposed to RSTART), signal this to the driver.
-    if (mon_dut_item.stop) cfg.got_stop = 1;
+    // Preserve the legacy sequence/monitor handshake only for legacy users.
+    if (cfg.use_legacy_got_stop_handshake && mon_dut_item.stop) cfg.got_stop = 1;
 
     // The transfer has ended. Send the completed item to the scoreboard.
     begin

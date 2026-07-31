@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 `include "i2c_base_vseq.sv"
+`include "i2c_rand_rst_safe_base_vseq.sv"
+`include "i2c_host_rst_safe_base_vseq.sv"
+`include "i2c_target_rst_safe_base_vseq.sv"
+`include "i2c_host_rst_safe_smoke_vseq.sv"
+`include "i2c_host_rst_safe_smoke_with_rand_reset_vseq.sv"
+`include "i2c_target_rst_safe_smoke_vseq.sv"
+`include "i2c_target_rst_safe_smoke_with_rand_reset_vseq.sv"
 `include "i2c_common_vseq.sv"
 `include "i2c_rx_tx_vseq.sv"
 `include "i2c_host_smoke_vseq.sv"

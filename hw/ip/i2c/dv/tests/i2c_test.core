@@ -11,6 +11,7 @@ filesets:
     files:
       - i2c_test_pkg.sv
       - i2c_base_test.sv: {is_include_file: true}
+      - i2c_rst_safe_base_test.sv: {is_include_file: true}
     file_type: systemVerilogSource
 
 targets:

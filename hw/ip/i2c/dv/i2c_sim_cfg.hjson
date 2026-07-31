@@ -63,6 +63,22 @@
       name: i2c_host_smoke
       uvm_test_seq: i2c_host_smoke_vseq
     }
+    {
+      name: i2c_host_rst_safe_smoke
+      uvm_test: i2c_rst_safe_base_test
+      uvm_test_seq: i2c_host_rst_safe_smoke_vseq
+      reseed: 10
+      run_timeout_mins: 180
+      run_opts: ["+test_timeout_ns=10000000000"]
+    }
+    {
+      name: i2c_host_rst_safe_smoke_with_rand_reset
+      uvm_test: i2c_rst_safe_base_test
+      uvm_test_seq: i2c_host_rst_safe_smoke_with_rand_reset_vseq
+      reseed: 10
+      run_timeout_mins: 180
+      run_opts: ["+test_timeout_ns=10000000000"]
+    }
 
     {
       name: i2c_host_override
@@ -144,6 +160,22 @@
       name: i2c_target_smoke
       uvm_test_seq: i2c_target_smoke_vseq
       run_opts: ["+i2c_agent_mode=Host", "+test_timeout_ns=100_000_000"]
+    }
+    {
+      name: i2c_target_rst_safe_smoke
+      uvm_test: i2c_rst_safe_base_test
+      uvm_test_seq: i2c_target_rst_safe_smoke_vseq
+      reseed: 10
+      run_timeout_mins: 180
+      run_opts: ["+i2c_agent_mode=Host", "+test_timeout_ns=10000000000"]
+    }
+    {
+      name: i2c_target_rst_safe_smoke_with_rand_reset
+      uvm_test: i2c_rst_safe_base_test
+      uvm_test_seq: i2c_target_rst_safe_smoke_with_rand_reset_vseq
+      reseed: 10
+      run_timeout_mins: 180
+      run_opts: ["+i2c_agent_mode=Host", "+test_timeout_ns=10000000000"]
     }
     {
       name: i2c_target_stress_wr

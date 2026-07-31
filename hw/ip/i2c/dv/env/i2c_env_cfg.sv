@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 typedef class i2c_scoreboard;
 
-class i2c_env_cfg extends cip_base_env_cfg #(.RAL_T(i2c_reg_block));
+class i2c_env_cfg extends cip_rst_safe_base_env_cfg #(.RAL_T(i2c_reg_block));
 
   i2c_scoreboard scoreboard;
   virtual i2c_dv_if i2c_dv_vif;
@@ -14,6 +14,12 @@ class i2c_env_cfg extends cip_base_env_cfg #(.RAL_T(i2c_reg_block));
 
   rand i2c_agent_cfg m_i2c_agent_cfg;
   i2c_seq_cfg seq_cfg;
+
+  // Build-time compatibility policy. The normal environment leaves this set so
+  // that existing sequences continue to see the legacy runtime bookkeeping.
+  // The reset-safe environment clears it and keeps runtime state local to the
+  // model, scoreboard and sequences.
+  bit legacy_runtime_state_compat = 1'b1;
 
   i2c_target_addr_mode_e target_addr_mode = Addr7BitMode; // (dv supports 7-bit addresses only)
 

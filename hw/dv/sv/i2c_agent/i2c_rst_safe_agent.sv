@@ -5,7 +5,7 @@
 class i2c_rst_safe_agent extends dv_rst_safe_base_agent #(
       .CFG_T           (i2c_agent_cfg),
       .DRIVER_T        (i2c_rst_safe_driver),
-      .SEQUENCER_T     (i2c_sequencer),
+      .SEQUENCER_T     (i2c_rst_safe_sequencer),
       .MONITOR_T       (i2c_rst_safe_monitor),
       .COV_T           (i2c_agent_cov)
   );

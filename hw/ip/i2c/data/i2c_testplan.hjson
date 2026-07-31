@@ -37,6 +37,25 @@
       features: ["I2C.MODE.HOST", "I2C.PROTOCOL.REPEATEDSTART", "I2C.PROTOCOL.NACK", "I2C.OPERATION.READ", "I2C.OPERATION.WRITE"]
     }
     {
+      name: host_rst_safe_smoke
+      desc: '''
+            Reset-safe host-mode functional smoke.
+
+            Stimulus:
+              - Configure DUT/Agent as Host/Target
+              - Execute direct read operations from main_thread
+              - Run an owned reactive target and CSR interrupt handler
+              - Repeat with reset injected during functional operation
+
+            Checking:
+              - Match monitor-derived host read expectations and observations
+              - Discard partial reset-epoch state without stale comparisons
+            '''
+      stage: V1
+      tests: ["i2c_host_rst_safe_smoke",
+              "i2c_host_rst_safe_smoke_with_rand_reset"]
+    }
+    {
       name: host_error_intr
       desc: '''
             Test error interrupts are asserted by the Host DUT due to
@@ -284,6 +303,25 @@
       stage: V1
       tests: ["i2c_target_smoke"]
       features: ["I2C.MODE.TARGET", "I2C.OPERATION.READ", "I2C.OPERATION.WRITE", "I2C.PROTOCOL.REPEATEDSTART", "I2C.PROTOCOL.NACK"]
+    }
+    {
+      name: target_rst_safe_smoke
+      desc: '''
+            Reset-safe target-mode functional smoke.
+
+            Stimulus:
+              - Configure DUT/Agent as Target/Host
+              - Execute direct finite read and write controller transactions
+              - Drain ACQ observations using frontdoor CSR accesses
+              - Repeat with reset injected during functional operation
+
+            Checking:
+              - Match monitor-derived target read/write expectations and observations
+              - Discard partial reset-epoch state without stale comparisons
+            '''
+      stage: V1
+      tests: ["i2c_target_rst_safe_smoke",
+              "i2c_target_rst_safe_smoke_with_rand_reset"]
     }
     {
       name: target_error_intr

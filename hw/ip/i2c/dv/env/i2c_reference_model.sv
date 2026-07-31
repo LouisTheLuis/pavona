@@ -116,8 +116,13 @@ class i2c_reference_model extends uvm_component;
   local i2c_item exp_wr_item;
   local i2c_item exp_rd_item, rd_pending_item;
   local i2c_item rd_pending_q[$]; // Helper-queue : holds partial read transactions
+  // RDATA can be observed before the corresponding FDATA prediction reaches the
+  // model. Keep the observation locally and reconcile it when both halves exist;
+  // process_tl_access() must never wait for a later transaction.
+  local bit [bus_params_pkg::BUS_DW-1:0] pending_rdata_q[$];
   local uint rdata_cnt = 0; // Count data-bytes read in a single transfer (DUT-Controller)
   local uint controller_mode_reset_count = 0;
+  local bit model_under_reset = 1'b0;
 
   // DUT-Target Operation
   //
@@ -204,6 +209,10 @@ class i2c_reference_model extends uvm_component;
     bit tl_accessackdata = (!write && channel == DataChannel); // read
     bit tl_accessack     =  (write && channel == DataChannel);
 
+    // Reset-safe TL monitors do not publish accesses during reset. Keep this
+    // defensive guard model-local so runtime reset state never travels through cfg.
+    if (model_under_reset) return;
+
     if (tl_putdata) begin
       // Incoming access is a write to a valid csr, so update the RAL right away
       void'(csr.predict(.value(item.a_data), .kind(UVM_PREDICT_WRITE), .be(item.a_mask)));
@@ -262,13 +271,15 @@ class i2c_reference_model extends uvm_component;
         // If we write new addresses into the DUT, also update the agent's configuration
         // with the same value(s).
         // TODO(#23920) Remove knowledge of the DUT Addresses from the i2c_agent
-        cfg.m_i2c_agent_cfg.target_addr0 = get_field_val(ral.target_id.address0, data);
-        cfg.m_i2c_agent_cfg.target_addr1 = get_field_val(ral.target_id.address1, data);
+        if (cfg.legacy_runtime_state_compat) begin
+          cfg.m_i2c_agent_cfg.target_addr0 = get_field_val(ral.target_id.address0, data);
+          cfg.m_i2c_agent_cfg.target_addr1 = get_field_val(ral.target_id.address1, data);
+        end
       end
 
       "fdata": begin // aka. FMTFIFO
         // Only capture items if not in reset, and HOST/CONTROLLER mode is active.
-        if (!cfg.under_reset && `gmv(ral.ctrl.enablehost)) begin
+        if (!model_under_reset && `gmv(ral.ctrl.enablehost)) begin
           // Capture exp/obs data for checking.
           fmtfifo_write(data);
         end
@@ -302,7 +313,9 @@ class i2c_reference_model extends uvm_component;
 
       "acqdata": begin
         acqdata_rd.push_back(data[10:0]);
-        cfg.obs_num_acqfifo_reads++; // Used for stimulus generation purposes #TODO Remove
+        if (cfg.legacy_runtime_state_compat) begin
+          cfg.obs_num_acqfifo_reads++; // Used by legacy stimulus generation. TODO(#23920): Remove.
+        end
       end
 
       default:;
@@ -425,6 +438,10 @@ class i2c_reference_model extends uvm_component;
           rd_pending_q.push_back(tmp_rd_item);
           prev_item.push_back(tmp_rd_item); // Keep track of the previously pushed item.
 
+          // A TL RDATA response may have arrived before this FDATA write. Reconcile
+          // the two observations now without consuming simulation time.
+          reconcile_pending_rdata();
+
           // If this read also set the 'stop' bit to end the transaction, clear the
           // temporary variable we use to accumulate chained reads.
           if (exp_rd_item.stop) `uvm_create_obj(i2c_item, exp_rd_item);
@@ -442,70 +459,45 @@ class i2c_reference_model extends uvm_component;
   //
   task rdata_read(bit [bus_params_pkg::BUS_DW-1:0] data);
     if (`gmv(ral.ctrl.enablehost)) begin
+      pending_rdata_q.push_back(data);
+      reconcile_pending_rdata();
+    end
 
-      // First, check if we need to wait for new data from a FMTFIFO write.
-      //
-      // 1) If read data count is 0, it means the transaction has not yet started.
-      //
-      // 2) If read data count is non-zero and equals the expected number of bytes while the stop
-      //    bit is not set, it means a chained read has been issued and we need to update the
-      //    expected transaction with the amount of data in the next item.
-      //
-      // 3) After the stop bit was set in the FMTFIFO, we won't pop any seq_items from the
-      //    pending queue until we have finished reading enough data bytes to complete the
-      //    length of the read transfer. Once we complete the read and push the item for checking,
-      //    'rdata_cnt' is reset to zero, and then we enter this block and pick up the start item
-      //    of the next read.
-      if (rdata_cnt == 0 ||                        // 1)
-          rdata_cnt == rd_pending_item.num_data && // 2)
-          !rd_pending_item.stop) begin             // 3)
+  endtask: rdata_read
 
-        // Block until a FMTFIFO-write creates a new item, then update our expectations.
-        wait(rd_pending_q.size() > 0 ||
-             cfg.under_reset); // for on-the-fly reset, immediately finish task to avoid blocking
-        if (cfg.under_reset) return;
+  // Join FDATA predictions and RDATA observations in either arrival order. This
+  // routine contains no timing control and is safe to call from the TL FIFO worker.
+  task reconcile_pending_rdata();
+    while (pending_rdata_q.size() > 0) begin
+      bit needs_pending_item =
+          (rdata_cnt == 0) ||
+          (rdata_cnt == rd_pending_item.num_data && !rd_pending_item.stop);
 
-        begin
-          i2c_item temp_item = rd_pending_q.pop_front();
-          if (rdata_cnt == 0) begin
-            // If our bytecount is 0, this is the first item created by the FMTFIFO write, so take
-            // the item and acculuate read data into it directly. This item contains the address
-            // etc., and further items will only contain the expected byte count for chained reads,
-            // or a stop-indicator to end the transfer.
-            rd_pending_item = temp_item;
-          end else begin
-            // If 'rdata_cnt' is non_zero, then we have already received at least one item from
-            // the FMTFIFO, therefore we are in a chain read (RCONT).
-            // Update the expected number of bytes (so we keep capturing new bytes into the existing
-            // item), and the stop bit if the end of the read has been marked.
-            rd_pending_item.num_data = temp_item.num_data;
-            rd_pending_item.stop = temp_item.stop;
-          end
+      if (needs_pending_item) begin
+        i2c_item temp_item;
+        if (rd_pending_q.size() == 0) return;
+        temp_item = rd_pending_q.pop_front();
+        if (rdata_cnt == 0) begin
+          rd_pending_item = temp_item;
+        end else begin
+          rd_pending_item.num_data = temp_item.num_data;
+          rd_pending_item.stop = temp_item.stop;
         end
-
       end
 
-      rd_pending_item.data_q.push_back(data);
+      rd_pending_item.data_q.push_back(pending_rdata_q.pop_front());
       rdata_cnt++;
 
-      // If we have completed a read transaction, push it to the 'controller_mode_rd_port'
-      if (rd_pending_item.num_data == rdata_cnt &&
-          rd_pending_item.stop) begin
+      if (rd_pending_item.num_data == rdata_cnt && rd_pending_item.stop) begin
         rdata_cnt = 0;
         rd_pending_item.data_ack_q.push_back(i2c_pkg::NACK);
-
         push_complete_dut_controller_xfer(rd_pending_item);
-
-        // Zero-out the pending item, though we will soon drop it for a new
-        // item the next time we go around and pick up the new FMTFIFO write.
         rd_pending_item.clear_all();
       end else begin
         rd_pending_item.data_ack_q.push_back(i2c_pkg::ACK);
       end
-
     end
-
-  endtask: rdata_read
+  endtask : reconcile_pending_rdata
 
 
   // Push DUT-Controller completed transfers items to the 'exp_controller_mode_txn_q[$]' once we
@@ -676,9 +668,11 @@ class i2c_reference_model extends uvm_component;
       // the transfer to be accepted, and to become visible at the ACQFIFO.
 
       // Count the number of ACQFIFO items we expect to read to completely observe the transfer.
-      cfg.exp_num_acqfifo_reads += 1 /*signal=start/rstart, abyte=addr+dir*/ +
-                          obs_xfer.num_data /*signal=none, abyte=data*/ +
-                          (obs_xfer.stop ? 1 /*signal=stop, abyte=xx*/ : 0);
+      if (cfg.legacy_runtime_state_compat) begin
+        cfg.exp_num_acqfifo_reads += 1 /*signal=start/rstart, abyte=addr+dir*/ +
+                            obs_xfer.num_data /*signal=none, abyte=data*/ +
+                            (obs_xfer.stop ? 1 /*signal=stop, abyte=xx*/ : 0);
+      end
 
       // #TODO Add the captured ACQFIFO write data into the sequence item we got from the monitor
       // exp_wr_xfer.data_q = '{};
@@ -707,8 +701,10 @@ class i2c_reference_model extends uvm_component;
       exp_rd_xfer = obs_xfer;
 
       // Count the number of ACQFIFO items we expect to read to completely observe the transfer.
-      cfg.exp_num_acqfifo_reads += 1 /*signal=start/rstart, abyte=addr+dir*/ +
-                                   (exp_rd_xfer.stop ? 1 /*signal=stop, abyte=xx*/ : 0);
+      if (cfg.legacy_runtime_state_compat) begin
+        cfg.exp_num_acqfifo_reads += 1 /*signal=start/rstart, abyte=addr+dir*/ +
+                                     (exp_rd_xfer.stop ? 1 /*signal=stop, abyte=xx*/ : 0);
+      end
 
       // If we received the item from the monitor, that means the transfer must have already
       // ended. Therefore, we know any data in the item has already been written into the
@@ -733,6 +729,7 @@ class i2c_reference_model extends uvm_component;
     exp_controller_mode_txn_q = {};
     prev_item = {};
     rd_pending_q = {};
+    pending_rdata_q = {};
     rd_pending_item.clear_all();
     exp_rd_item.clear_all();
     exp_wr_item.clear_all();
@@ -757,7 +754,26 @@ class i2c_reference_model extends uvm_component;
     reset_controller_mode();
     reset_target_mode();
 
+    // The RAL has already been reset by either scoreboard before this hook.
+    // Rebuild model-owned target state from the reset mirror without exporting
+    // that runtime state through cfg.
+    target_addr0 = `gmv(ral.target_id.address0);
+    target_addr1 = `gmv(ral.target_id.address1);
+
     `uvm_info(`gfn, "i2c_reference_model is reset now.", UVM_LOW)
   endfunction : reset
+
+  // Reset-safe scoreboard lifecycle hooks. reset() remains a compatibility API
+  // for the unchanged legacy scoreboard and intentionally does not alter the
+  // model-local reset flag.
+  virtual function void reset_asserted();
+    if (model_under_reset) return;
+    model_under_reset = 1'b1;
+    reset();
+  endfunction : reset_asserted
+
+  virtual function void reset_deasserted();
+    model_under_reset = 1'b0;
+  endfunction : reset_deasserted
 
 endclass : i2c_reference_model

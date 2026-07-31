@@ -10,6 +10,7 @@ package i2c_env_pkg;
   import csr_utils_pkg::*;
   import dv_base_reg_pkg::*;
   import tl_agent_pkg::*;
+  import clk_rst_agent_pkg::*;
   import i2c_agent_pkg::*;
   import dv_lib_pkg::*;
   import cip_base_pkg::*;
@@ -126,7 +127,9 @@ package i2c_env_pkg;
   `include "i2c_virtual_sequencer.sv"
   `include "i2c_reference_model.sv"
   `include "i2c_scoreboard.sv"
+  `include "i2c_rst_safe_scoreboard.sv"
   `include "i2c_env.sv"
+  `include "i2c_rst_safe_env.sv"
   `include "i2c_vseq_list.sv"
 
 endpackage : i2c_env_pkg
