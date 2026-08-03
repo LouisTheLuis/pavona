@@ -23,7 +23,7 @@
            Basic hello world,  encrypt a plain text read it back - decrypt and compare to input.'''
       stage: V1
       tests: ["aes_wake_up"]
-      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128"]
+      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128", "AES.MANUAL_OPERATION"]
     }
     {
       name: smoke
@@ -31,7 +31,7 @@
            Encrypt a plain text read it back - decrypt and compare to input but use reference model to compare after both encryption and decryption.'''
       stage: V1
       tests: ["aes_smoke"]
-      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128"]
+      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128", "AES.MANUAL_OPERATION"]
     }
     {
       name: algorithm
@@ -39,7 +39,7 @@
            Compare cypher text from DUT with the output of a C model using same key and data.'''
            stage: V2
       tests: ["aes_smoke", "aes_stress", "aes_config_error"]
-      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128"]
+      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128", "AES.MANUAL_OPERATION"]
     }
     {
       name: key_length
@@ -47,7 +47,7 @@
            Randomly select key length to verify all supported key lengths are working.'''
            stage: V2
       tests: ["aes_stress", "aes_smoke", "aes_config_error"]
-      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128"]
+      features: ["AES.KEY_LEN.128", "AES.KEY_LEN.192", "AES.KEY_LEN.256", "AES.MODE.ECB", "AES.MODE.CBC", "AES.MODE.OFB", "AES.MODE.CTR", "AES.MODE.CFB-128", "AES.MANUAL_OPERATION"]
     }
     {
       name: back2back
@@ -64,7 +64,7 @@
         Try to write data to registers without offloading the DUT output to verify Stall functionality.'''
         stage: V2
       tests: ["aes_stress"]
-      features: ["AES.STATUS.STALL"]
+      features: ["AES.STATUS.STALL", "AES.MANUAL_OPERATION"]
     }
     {
       name: multi_message
@@ -96,7 +96,7 @@
             Example of a cornercases clearing data input or data output before the data is consumed or the DUT finishes an operation.'''
       stage: V2
       tests: ["aes_clear"]
-      features: ["AES.CLEAR.DATA_OUT", "AES.CLEAR.KEY_IV_DATA_IN"]
+      features: ["AES.CLEAR.DATA_OUT", "AES.CLEAR.KEY_IV_DATA_IN", "AES.MANUAL_OPERATION"]
     }
     {
       name: nist_test_vectors
@@ -129,7 +129,7 @@
             and that it ignores any valid on the bus when disabled.'''
       stage: V2
       tests: ["aes_stress", "aes_sideload"]
-      features: ["AES.KEY.SIDELOAD"]
+      features: ["AES.KEY.SIDELOAD", "AES.MANUAL_OPERATION"]
     }
     {
       name: deinitialization
@@ -159,7 +159,7 @@
             '''
       stage: V2S
       tests: ["aes_reseed"]
-      features: ["AES.PRNG.RESEED_RATE", "AES.PRNG.KEY_TOUCH_FORCES_RESEED", "AES.PRNG.FORCE_MASKS"]
+      features: ["AES.PRNG.RESEED_RATE", "AES.PRNG.KEY_TOUCH_FORCES_RESEED", "AES.PRNG.FORCE_MASKS", "AES.MANUAL_OPERATION"]
     }
     {
       name:fault_inject
