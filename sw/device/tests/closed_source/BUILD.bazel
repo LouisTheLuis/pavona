@@ -140,6 +140,7 @@ cc_library(
 ################################################################################
 # OTFT-Step 1: Copy/paste the below `pavona_test` to add an additional
 # manufacturer-specific test.
+# Egret version of example_test - uses mask_rom
 pavona_test(
     name = "example_test",
     srcs = ["example_test.c"],
@@ -155,6 +156,25 @@ pavona_test(
         "@//hw/top_egret:fpga_cw310_rom_with_fake_keys": None,
         "@//hw/top_egret:fpga_cw310_test_rom": None,
         "@//hw/top_egret:sim_dv": None,
+        "@//hw/top_dragonfly:sim_dv": None,
+    },
+    # We need to specify the manifest because the simulation environments do not
+    # specify one by default.
+    manifest = "@//sw/device/silicon_creator/rom_ext:manifest",
+    deps = [
+        "@//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+# Dragonfly version of example_test - uses default ROMs (test_rom + test_second_rom)
+pavona_test(
+    name = "example_test_dragonfly",
+    srcs = ["example_test.c"],
+    ecdsa_key = ecdsa_key_for_lc_state(
+        ECDSA_ONLY_KEY_STRUCTS,
+        CONST.LCV.TEST_UNLOCKED0,
+    ),
+    exec_env = {
         "@//hw/top_dragonfly:sim_dv": None,
     },
     # We need to specify the manifest because the simulation environments do not
@@ -183,6 +203,7 @@ pavona_test(
 # `MANUFACTURER_HOOKS_DIR=/path/to/test_hooks
 #     bazel test @manufacturer_test_hooks//:statically_hooked_opensource_test`
 ################################################################################
+# Egret version - uses mask_rom
 pavona_test(
     name = "statically_hooked_opensource_test",
     srcs = ["@//sw/device/tests:example_test_from_flash.c"],
@@ -198,6 +219,26 @@ pavona_test(
         "@//hw/top_egret:fpga_cw310_rom_with_fake_keys": None,
         "@//hw/top_egret:fpga_cw310_test_rom": None,
         "@//hw/top_egret:sim_dv": None,
+        "@//hw/top_dragonfly:sim_dv": None,
+    },
+    # We need to specify the manifest because the simulation environments do not
+    # specify one by default.
+    manifest = "@//sw/device/silicon_creator/rom_ext:manifest",
+    deps = [
+        "@//sw/device/lib/testing/test_framework:ottf_main",
+        "@manufacturer_test_hooks//:test_hooks_1",
+    ],
+)
+
+# Dragonfly version - uses default ROMs (test_rom + test_second_rom)
+pavona_test(
+    name = "statically_hooked_opensource_test_dragonfly",
+    srcs = ["@//sw/device/tests:example_test_from_flash.c"],
+    ecdsa_key = ecdsa_key_for_lc_state(
+        ECDSA_ONLY_KEY_STRUCTS,
+        CONST.LCV.TEST_UNLOCKED0,
+    ),
+    exec_env = {
         "@//hw/top_dragonfly:sim_dv": None,
     },
     # We need to specify the manifest because the simulation environments do not
