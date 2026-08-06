@@ -12,6 +12,11 @@ class kmac_key_error_vseq extends kmac_app_vseq;
     num_trans inside {[1:20]};
   }
 
+  // constrain the message to always have a size greater than 0
+  constraint msg_size_c {
+    msg.size() > 0;
+  }
+
   virtual task body();
     kmac_pkg::err_t kmac_err;
     cfg.en_scb = 0;
