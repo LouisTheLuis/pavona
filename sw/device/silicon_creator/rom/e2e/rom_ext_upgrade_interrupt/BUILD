@@ -3,6 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load(
+    "//hw/top:defs.bzl",
+    "pavona_select_top",
+)
+load(
     "//rules/pavona:defs.bzl",
     "ecdsa_key_for_lc_state",
     "fpga_params",
@@ -50,7 +54,13 @@ otp_json(
 [
     otp_image(
         name = "otp_img_rom_ext_upgrade_interrupt_{}".format(lc_state),
-        src = "//hw/top_egret/data/otp:otp_json_{}".format(lc_state),
+        src = pavona_select_top(
+            {
+                "egret": "//hw/top_egret/data/otp:otp_json_{}".format(lc_state),
+                "dragonfly": "//hw/top_dragonfly/data/otp:otp_json_{}".format(lc_state),
+            },
+            None,
+        ),
         overlays = STD_OTP_OVERLAYS + [":otp_json_rom_ext_upgrade_interrupt"],
         visibility = ["//visibility:private"],
     )

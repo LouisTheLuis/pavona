@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include <stdbool.h>
 
+#include "hw/top/dt/keymgr.h"
 #include "hw/top/dt/otp_ctrl.h"
+#include "hw/top/dt/rstmgr.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_keymgr.h"
 #include "sw/device/lib/dif/dif_otp_ctrl.h"
@@ -24,7 +25,6 @@
 #include "sw/device/silicon_creator/lib/manifest_def.h"
 
 #include "hw/top/otp_ctrl_regs.h"  // Generated
-#include "hw/top_egret/sw/autogen/top_egret.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -85,22 +85,35 @@ bool test_main(void) {
     //   - the digest of the CreatorSwCfg partition,
     //   - the digest of the OwnerSwCfg partition,
     //   - the SHA256 integrity hash of the first stage boot keys.
-    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl, kOtpPartitionCreatorSwCfg,
-                                         (uint64_t *)otp_state));
-    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl, kOtpPartitionOwnerSwCfg,
-                                         (uint64_t *)&otp_state[2]));
-    CHECK_STATUS_OK(otp_ctrl_testutils_dai_read32_array(
-        &otp_ctrl, kOtpPartitionRotCreatorAuthCodesign,
-        OTP_CTRL_PARAM_ROTCREATORAUTHCODESIGNBLOCKSHA2_256HASHOFFSET -
-            OTP_CTRL_PARAM_ROT_CREATOR_AUTH_CODESIGN_OFFSET,
-        &otp_state[4], /*num_words=*/kHmacDigestNumWords));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(
+        &otp_ctrl, kOtpPartitionCreatorSwCfg, (uint64_t *)otp_state));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(
+        &otp_ctrl, kOtpPartitionOwnerSwCfg, (uint64_t *)&otp_state[2]));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl,
+                                         kOtpPartitionRotOwnerAuthSlot0,
+                                         (uint64_t *)&otp_state[4]));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl,
+                                         kOtpPartitionRotOwnerAuthSlot1,
+                                         (uint64_t *)&otp_state[6]));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl,
+                                         kOtpPartitionRotOwnerAuthSlot2,
+                                         (uint64_t *)&otp_state[8]));
+    CHECK_DIF_OK(dif_otp_ctrl_get_digest(&otp_ctrl,
+                                         kOtpPartitionRotOwnerAuthSlot3,
+                                         (uint64_t *)&otp_state[10]));
     hmac_digest_t otp_measurement;
     hmac_sha256(otp_state, sizeof(otp_state), &otp_measurement);
     LOG_INFO("OTP CreatorSwCfg Digest: 0x%08x%08x", otp_state[1], otp_state[0]);
     LOG_INFO("OTP OwnerSwCfg Digest:   0x%08x%08x", otp_state[3], otp_state[2]);
-    LOG_INFO("OTP Root Keys Digest:    0x%08x%08x%08x%08x%08x%08x%08x%08x",
-             otp_state[11], otp_state[10], otp_state[9], otp_state[8],
-             otp_state[7], otp_state[6], otp_state[5], otp_state[4]);
+    LOG_INFO("OTP RotOwnerAuthSlot0 Digest:   0x%08x%08x", otp_state[5],
+             otp_state[4]);
+    LOG_INFO("OTP RotOwnerAuthSlot1 Digest:   0x%08x%08x", otp_state[7],
+             otp_state[6]);
+    LOG_INFO("OTP RotOwnerAuthSlot2 Digest:   0x%08x%08x", otp_state[9],
+             otp_state[8]);
+    LOG_INFO("OTP RotOwnerAuthSlot3 Digest:   0x%08x%08x", otp_state[11],
+             otp_state[10]);
+
     CHECK_ARRAYS_EQ(bindings.attestation, otp_measurement.digest,
                     ARRAYSIZE(bindings.attestation));
   } else {
