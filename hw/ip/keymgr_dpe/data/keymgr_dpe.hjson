@@ -256,6 +256,7 @@
             the internal key manager state. The derived keys can be directed to software registers,
             or sideloaded to hardware security blocks.
             '''
+    }
     {
       name: "KEYMGR_DPE.KEY_VERSIONING",
       desc: '''The maximum version value supported by KEYMGR_DPE.GENERATE.OUTPUT is configurable via a
