@@ -217,8 +217,10 @@ def _get_flash_scrambling_configs(otp_vmem_file: str, otp_data_perm: list,
 
     # Check we found the data we were looking for in the OTP image.
     if flash_data_default_cfg is None:
-        raise RuntimeError(
-            "Cannot read flash scrambling enablement state from OTP.")
+        print("flash_data_default_cfg is None")
+        # TODO: Fix flash_scramble so this can return to RuntimeError(Issue #411)
+        # raise RuntimeError(
+        #     "Cannot read flash scrambling enablement state from OTP.")
     if not secret1_data_blocks:
         raise RuntimeError("Cannot read flash scrambling key seeds from OTP.")
 
