@@ -24,7 +24,7 @@ class kmac_long_msg_and_output_vseq extends kmac_smoke_vseq;
     msg.size() dist {
       0               :/ 1,
       [1    : 2500]   :/ 1,
-      [2501 : 5000]   :/ 1,
+      [2501 : 5000]   :/ ((cfg.max_msg_size < 5000) ? 0 : 1),
       [5001 : 7500]   :/ ((cfg.max_msg_size < 7500) ? 0 : 3),
       [5001 : 10_000] :/ ((cfg.max_msg_size < 10_000) ? 0 : 4)
     };
