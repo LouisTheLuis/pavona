@@ -28,13 +28,25 @@ class spi_host_smoke_vseq extends spi_host_tx_rx_vseq;
           start_agent_reactive_seqs();
         join_none
 
-        begin
+        begin : run_txns
+          spi_host_status_t status;
+          bit [7:0]         read_q[$];
           wait_ready_for_command();
           start_spi_host_trans(num_trans);
           csr_spinwait(.ptr(ral.status.active), .exp_data(1'b0));
+          // read_rx_fifo() returns on inactive-and-empty, but more data can land afterwards with
+          // nobody left to drain it. Wait for it to finish, then empty whatever arrived, so the
+          // spinwait below has something to confirm instead of something to wait out.
+          if (num_rd > 0) wait (rd_rx_fifo_finished);
+          do begin
+            csr_rd(.ptr(ral.status), .value(status), .backdoor(1));
+            for (int i = 0; i < status.rx_qd; i++) begin
+              access_data_fifo(read_q, RxFifo);
+            end
+          end while (status.rx_qd > 0);
           csr_spinwait(.ptr(ral.status.rxqd), .exp_data(8'h0));
           cfg.clk_rst_vif.wait_clks(100);
-        end
+        end : run_txns
 
         disable fork;
       end
@@ -43,7 +55,7 @@ class spi_host_smoke_vseq extends spi_host_tx_rx_vseq;
         // Only calling rd_rx_fifo if there are reads on the bus
         // otherwise `rd_rx_fifo` will lock up
         if (num_rd > 0)
-          read_rx_fifo();
+          read_rx_fifo(.producer_running(1));
       end
     join
   endtask : body
