@@ -19,8 +19,25 @@ class csrng_scoreboard extends cip_base_scoreboard #(
   bit [CSRNG_BUS_WIDTH-1:0]                               cs_data[NUM_HW_APPS + 1],
                                                           es_data[NUM_HW_APPS + 1];
   bit                                                     fips[NUM_HW_APPS + 1];
-  // Sample interrupt pins at read data phase. This is used to compare with intr_state read value.
-  bit [3:0] intr_pins;
+  // Latest interrupt pin state, taken from the monitor transactions rather than sampled from the
+  // interface here. process_intr_events is the only writer.
+  local bit [NumCsrngIntr-1:0] observed_intr_pins;
+
+  // The above as it stood at the address phase of the intr_state read now in flight. A scalar is
+  // enough: the register adapter takes one access at a time, so the ordered stream this is driven
+  // from is always an address phase followed by that same read's data phase.
+  bit [NumCsrngIntr-1:0] intr_pins;
+
+  // Interrupt enable as the block last accepted it. The RAL mirror cannot be used for this. It is
+  // reset by dv_base_scoreboard when reset deasserts, which discards an intr_enable write the
+  // sequence has already completed, and a read afterwards is then checked against an enable of zero
+  // while the block has it set.
+  //
+  // Taken from the data phase rather than the address phase so that a write the block rejected,
+  // which the tl_errors sequence generates in quantity, is not recorded. The register adapter takes
+  // one access at a time, so no intr_state read can be accepted between an intr_enable write being
+  // accepted and its response, which is what would otherwise leave this stale.
+  bit [3:0] intr_en_at_access;
   bit [SW_APP:0] genbits_fips_previous;
   bit [SW_APP:0] genbits_fips_received = '0;
   mubi4_t [SW_APP:0] cmd_flag0_previous;
@@ -34,6 +51,15 @@ class csrng_scoreboard extends cip_base_scoreboard #(
   // TLM agent fifos
   uvm_tlm_analysis_fifo#(push_pull_item#(.HostDataWidth(FIPS_CSRNG_BUS_WIDTH)))   entropy_src_fifo;
   uvm_tlm_analysis_fifo#(csrng_item)   csrng_cmd_fifo[NUM_HW_APPS];
+  // Interrupt pin observations from csrng_intr_monitor, drained by process_intr_events.
+  uvm_tlm_analysis_fifo#(csrng_intr_item) intr_event_fifo;
+
+  // A second subscriber on the TL monitor, drained by sample_intr_pins. All three ports are needed:
+  // the direction port keeps the address and data channels in bus order, which is what lets an
+  // enable taken from a data phase be trusted by a read sampled at a later address phase.
+  uvm_tlm_analysis_fifo#(tl_channels_e) intr_tl_dir_fifo;
+  uvm_tlm_analysis_fifo#(tl_seq_item)   intr_tl_a_fifo;
+  uvm_tlm_analysis_fifo#(tl_seq_item)   intr_tl_d_fifo;
 
   `uvm_component_new
 
@@ -41,6 +67,10 @@ class csrng_scoreboard extends cip_base_scoreboard #(
     super.build_phase(phase);
 
     entropy_src_fifo = new("entropy_src_fifo", this);
+    intr_event_fifo  = new("intr_event_fifo", this);
+    intr_tl_dir_fifo = new("intr_tl_dir_fifo", this);
+    intr_tl_a_fifo   = new("intr_tl_a_fifo", this);
+    intr_tl_d_fifo   = new("intr_tl_d_fifo", this);
 
     for (int i = 0; i < NUM_HW_APPS; i++) begin
       csrng_cmd_fifo[i] = new($sformatf("csrng_cmd_fifo[%0d]", i), this);
@@ -61,6 +91,8 @@ class csrng_scoreboard extends cip_base_scoreboard #(
     fork
       collect_seeds();
       handle_disable();
+      process_intr_events();
+      sample_intr_pins();
     join_none;
 
     for (int i = 0; i < NUM_HW_APPS; i++) begin
@@ -70,6 +102,80 @@ class csrng_scoreboard extends cip_base_scoreboard #(
           process_csrng_cmd_fifo(j);
         end
       join_none;
+    end
+  endtask
+
+  // Keep the observed pin state from the monitor transactions. Nothing above the monitor samples
+  // the interface, so this is the scoreboard's only source for it.
+  virtual protected task process_intr_events();
+    forever begin
+      csrng_intr_item item;
+      intr_event_fifo.get(item);
+      observed_intr_pins = item.pins;
+    end
+  endtask
+
+  // Record the observed pins for every intr_state read, at the moment the read is accepted on the
+  // bus. Nothing in here blocks, so it keeps up with the bus even while process_tl_access is
+  // waiting for entropy.
+  //
+  // intr_o is a flop of intr_state & intr_enable and the register adapter latches its read data in
+  // the cycle the request is accepted, so the pins seen here are the ones belonging to the data
+  // that read will return. The interrupt enable is tracked here too, for the reason given at its
+  // declaration.
+  virtual protected task sample_intr_pins();
+    forever begin
+      tl_channels_e dir;
+      tl_seq_item   item;
+      uvm_reg       csr;
+
+      intr_tl_dir_fifo.get(dir);
+      case (dir)
+        AddrChannel: `DV_CHECK_FATAL(intr_tl_a_fifo.try_get(item),
+                                     "dir fifo pointed at A channel, but a fifo empty")
+        DataChannel: `DV_CHECK_FATAL(intr_tl_d_fifo.try_get(item),
+                                     "dir fifo pointed at D channel, but d fifo empty")
+        default: `uvm_fatal(`gfn, "Invalid entry in intr_tl_dir_fifo")
+      endcase
+
+      csr = ral.default_map.get_reg_by_offset(ral.get_word_aligned_addr(item.a_addr));
+      if (csr == null) continue;
+
+      case (csr.get_name())
+        "intr_state": begin
+          if (dir == AddrChannel && !item.is_write()) begin
+            intr_pins = observed_intr_pins;
+          end else if (dir == DataChannel && !item.is_write() && !item.d_error &&
+                       cov_vif.en_full_cov) begin
+            // Checked here rather than in process_tl_access. That task blocks waiting for entropy,
+            // so it handles data phases long after the bus has moved on, and a pin sample handed
+            // to it can be overtaken before it gets there. TL sources are reused, so the next read
+            // of this register can carry the same source as one whose data phase is still pending,
+            // which is what made a sample keyed by source get taken by the wrong read.
+            //
+            // Accesses the block answered with an error are skipped, because their read data is
+            // not the register value and process_tl_access does not see them either.
+            foreach (intr_pins[i]) begin
+              csrng_intr_e intr = csrng_intr_e'(i);
+              `DV_CHECK_CASE_EQ(intr_pins[i], (intr_en_at_access[i] & item.d_data[i]),
+                                $sformatf("Interrupt_pin: %0s", intr.name));
+              if (cfg.en_cov) begin
+                cov.intr_cg.sample(i, intr_en_at_access[i], item.d_data[i]);
+                cov.intr_pins_cg.sample(i, intr_pins[i]);
+              end
+            end
+          end
+        end
+        "intr_enable": begin
+          if (dir == DataChannel && item.is_write() && !item.d_error && item.a_mask[0]) begin
+            // A partial write only updates the byte lanes it enables, and these bits are in byte 0.
+            // The csr and tl_errors sequences issue PutPartialData to this word, and to the sub
+            // word addresses inside it, so the mask has to be honoured.
+            intr_en_at_access = item.a_data[3:0];
+          end
+        end
+        default: ;
+      endcase
     end
   endtask
 
@@ -157,26 +263,16 @@ class csrng_scoreboard extends cip_base_scoreboard #(
     case (csr.get_name())
       // add individual case item for each csr
       "intr_state": begin
-        if (addr_phase_read) intr_pins = cfg.intr_vif.pins;
-        if (data_phase_read && cov_vif.en_full_cov) begin
-          bit [3:0] intr_en = `gmv(ral.intr_enable);
-          foreach (intr_pins[i]) begin
-            csrng_intr_e intr = csrng_intr_e'(i);
-            `DV_CHECK_CASE_EQ(intr_pins[i], (intr_en[i] & item.d_data[i]),
-                              $sformatf("Interrupt_pin: %0s", intr.name));
-            if (cfg.en_cov) begin
-              cov.intr_cg.sample(i, intr_en[i], item.d_data[i]);
-              cov.intr_pins_cg.sample(i, intr_pins[i]);
-            end
-          end
-        end
+        // The pin check is in sample_intr_pins, which this task's stalls do not reach.
         do_read_check = 1'b0;
       end
       "intr_enable": begin
         // FIXME
       end
       "intr_test": begin
-        if (addr_phase_write && cov_vif.en_full_cov) begin
+        // cov_vif.en_full_cov is tied high in the interface, so it says nothing about whether the
+        // covergroups were built. cov is only constructed when cfg.en_cov is set.
+        if (addr_phase_write && cov_vif.en_full_cov && cfg.en_cov) begin
           bit [3:0] intr_en  = `gmv(ral.intr_enable);
           bit [3:0] intr_exp = `gmv(ral.intr_state) | item.a_data;
           foreach (intr_exp[i]) begin
@@ -424,6 +520,14 @@ class csrng_scoreboard extends cip_base_scoreboard #(
   virtual function void reset(string kind = "HARD");
     super.reset(kind);
     // reset local fifos queues and variables
+    // The pin samples go when super.reset() flushes the TL fifos, so a read whose data phase the
+    // reset discarded cannot have its sample taken by a later read reusing the same source.
+    intr_event_fifo.flush();
+    observed_intr_pins = '0;
+    intr_tl_dir_fifo.flush();
+    intr_tl_a_fifo.flush();
+    intr_tl_d_fifo.flush();
+    intr_en_at_access = '0;
   endfunction
 
   function void check_phase(uvm_phase phase);

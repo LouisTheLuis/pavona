@@ -23,6 +23,8 @@ filesets:
       - csrng_env_cfg.sv: {is_include_file: true}
       - csrng_env_cov.sv: {is_include_file: true}
       - csrng_virtual_sequencer.sv: {is_include_file: true}
+      - csrng_intr_item.sv: {is_include_file: true}
+      - csrng_intr_monitor.sv: {is_include_file: true}
       - csrng_scoreboard.sv: {is_include_file: true}
       - csrng_env.sv: {is_include_file: true}
       - seq_lib/csrng_vseq_list.sv: {is_include_file: true}

@@ -47,6 +47,8 @@ package csrng_env_pkg;
     FifoErr    = 3
   } csrng_intr_e;
 
+  parameter uint     NumCsrngIntr               = 4;
+
   typedef enum int {
     invalid_enable         = 0,
     invalid_sw_app_enable  = 1,
@@ -181,6 +183,8 @@ package csrng_env_pkg;
   `include "csrng_env_cfg.sv"
   `include "csrng_env_cov.sv"
   `include "csrng_virtual_sequencer.sv"
+  `include "csrng_intr_item.sv"
+  `include "csrng_intr_monitor.sv"
   `include "csrng_scoreboard.sv"
   `include "csrng_env.sv"
   `include "csrng_vseq_list.sv"

@@ -16,6 +16,7 @@ class csrng_env extends cip_base_env #(
       m_aes_halt_agent;
   csrng_agent
       m_edn_agent[NUM_HW_APPS];
+  csrng_intr_monitor  m_intr_monitor;
 
   `uvm_component_new
 
@@ -49,6 +50,9 @@ class csrng_env extends cip_base_env #(
       cfg.m_edn_agent_cfg[i].en_cov  = cfg.en_cov;
     end
 
+    m_intr_monitor = csrng_intr_monitor::type_id::create("m_intr_monitor", this);
+    m_intr_monitor.vif = cfg.intr_vif;
+
     if (!uvm_config_db#(virtual pins_if#(MuBi8Width))::get(this, "", "otp_en_cs_sw_app_read_vif",
         cfg.otp_en_cs_sw_app_read_vif)) begin
       `uvm_fatal(get_full_name(), "failed to get otp_en_cs_sw_app_read_vif from uvm_config_db")
@@ -78,6 +82,20 @@ class csrng_env extends cip_base_env #(
         scoreboard.entropy_src_fifo.analysis_export);
       for (int i = 0; i < NUM_HW_APPS; i++) begin
         m_edn_agent[i].monitor.analysis_port.connect(scoreboard.csrng_cmd_fifo[i].analysis_export);
+      end
+      // Interrupt pin state reaches the scoreboard as a monitor transaction, so that no layer
+      // above the monitor samples the interface.
+      m_intr_monitor.analysis_port.connect(scoreboard.intr_event_fifo.analysis_export);
+
+      // A second set of subscribers alongside the ones cip_base_env connects. The scoreboard needs
+      // to know which access each observed pin value belongs to, and the loop that drains cip's own
+      // fifos blocks while modelling a SW app command. The direction port is included so this set
+      // is drained in bus order, like cip drains its own.
+      foreach (m_tl_agents[i]) begin
+        m_tl_agents[i].monitor.channel_dir_port.connect(
+            scoreboard.intr_tl_dir_fifo.analysis_export);
+        m_tl_agents[i].monitor.a_chan_port.connect(scoreboard.intr_tl_a_fifo.analysis_export);
+        m_tl_agents[i].monitor.d_chan_port.connect(scoreboard.intr_tl_d_fifo.analysis_export);
       end
     end
     if (cfg.is_active) begin
