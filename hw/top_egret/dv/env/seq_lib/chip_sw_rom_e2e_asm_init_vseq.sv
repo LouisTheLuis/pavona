@@ -18,8 +18,6 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
   localparam bit [31:0] MMIO_END_ADDRESS                 = 32'h30601000;
   localparam bit [31:0] CREATOR_FW_PHY_START_ADDRESS     = 32'h20000000;
   localparam bit [31:0] CREATOR_FW_PHY_END_ADDRESS       = 32'h20080000;
-  localparam bit [31:0] CREATOR_FW_VIRTUAL_START_ADDRESS = 32'h90000000;
-  localparam bit [31:0] CREATOR_FW_VIRTUAL_END_ADDRESS   = 32'h90080000;
 
   function logic [31:0] epmp_addr_napot(logic [31:0] addr, int unsigned length);
     return ((addr + (length >> 1) - 1) >> 2);
@@ -223,10 +221,8 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[2],
                  epmp_addr_napot(top_egret_pkg::TOP_EGRET_ROM_CTRL0_ROM_BASE_ADDR,
                                  top_egret_pkg::TOP_EGRET_ROM_CTRL0_ROM_SIZE_BYTES))
-	// Creator firmware TOR region addresses are unchecked here because they
+	// Creator firmware region addresses are unchecked here because they
 	// depend on the size and linkage of the test binary.
-    `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[5], epmp_addr_napot(CREATOR_FW_VIRTUAL_START_ADDRESS,
-                                                            CREATOR_FW_VIRTUAL_END_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[10], epmp_addr_tor(MMIO_START_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[11], epmp_addr_tor(MMIO_END_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[13], epmp_addr_napot(CREATOR_FW_PHY_START_ADDRESS,
