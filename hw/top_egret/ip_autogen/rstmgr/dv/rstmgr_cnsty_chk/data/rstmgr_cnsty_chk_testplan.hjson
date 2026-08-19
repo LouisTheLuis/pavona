@@ -9,35 +9,35 @@
       desc: '''Verify unexpected child_reset activity flags an error.
             '''
       stage: V2S
-      tests: ["rstmgr_cnsty_chk_smoke"]
+      tests: ["rstmgr_cnsty_chk_test"]
     }
     {
       name: child_reset_asserts_late
       desc: '''Verify error triggered if child reset asserts late.
             '''
       stage: V2S
-      tests: []
+      tests: ["rstmgr_cnsty_chk_test"]
     }
     {
       name: child_reset_releases_late
       desc: '''Verify error triggered if child reset releases late.
             '''
       stage: V2S
-      tests: []
+      tests: ["rstmgr_cnsty_chk_test"]
     }
     {
       name: parent_reset_asserts_late
       desc: '''Verify error triggered if parent reset asserts late.
             '''
       stage: V2S
-      tests: []
+      tests: ["rstmgr_cnsty_chk_test"]
     }
     {
       name: parent_reset_releases_late
       desc: '''Verify error triggered if parent reset releases late.
             '''
       stage: V2S
-      tests: []
+      tests: ["rstmgr_cnsty_chk_test"]
     }
   ]
 }
