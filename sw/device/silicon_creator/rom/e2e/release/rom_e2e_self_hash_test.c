@@ -37,7 +37,8 @@ enum {
  */
 
 #ifdef OPENTITAN_IS_EGRET
-const size_t kGoldenRom0SizeBytes = TOP_EGRET_ROM_CTRL0_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
+const size_t kGoldenRom0SizeBytes =
+    TOP_EGRET_ROM_CTRL0_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
 const uint32_t kSimDvGoldenRom0Hash[kSha256HashSizeIn32BitWords] = {
     0xc16e04d6, 0x2e94b881, 0x0759b405, 0xd0a28cde,
     0xa8c900f3, 0x57b8c7f6, 0xacc910b0, 0x43000c0a,
@@ -53,8 +54,10 @@ const uint32_t kSiliconGoldenRom0Hash[kSha256HashSizeIn32BitWords] = {
 #elif OPENTITAN_IS_DRAGONFLY
 #define HAS_ROM_CTRL1
 
-const size_t kGoldenRom0SizeBytes = TOP_DRAGONFLY_ROM_CTRL0_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
-const size_t kGoldenRom1SizeBytes = TOP_DRAGONFLY_ROM_CTRL1_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
+const size_t kGoldenRom0SizeBytes =
+    TOP_DRAGONFLY_ROM_CTRL0_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
+const size_t kGoldenRom1SizeBytes =
+    TOP_DRAGONFLY_ROM_CTRL1_ROM_SIZE_BYTES - 116 - sizeof(chip_info_t);
 const uint32_t kSimDvGoldenRom0Hash[kSha256HashSizeIn32BitWords] = {
     0xc16e04d6, 0x2e94b881, 0x0759b405, 0xd0a28cde,
     0xa8c900f3, 0x57b8c7f6, 0xacc910b0, 0x43000c0a,
