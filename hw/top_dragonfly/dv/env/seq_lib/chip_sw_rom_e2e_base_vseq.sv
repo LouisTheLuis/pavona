@@ -52,6 +52,13 @@ class chip_sw_rom_e2e_base_vseq extends chip_sw_base_vseq;
   virtual task rom_e2e_test_boot_fault_success(uint uart_idx = ROM_CONSOLE_UART);
     // ROM E2E tests that boot fault generate an alert that must be silenced before ending the test.
     apply_reset();
+    // We have to wait until the chip is out of reset before overriding the
+    // status to `SwTestStatusPassed`. Otherwise, `sw_test_status` is clobbered
+    // by the interface with `SwTestStatusUnderReset` on the next cycle, which
+    // will cause the test to incorrectly report a timeout, because
+    // `sw_test_status` will be neither `SwTestStatusPassed` or
+    // `SwTestStatusFailed`.
+    cfg.chip_vif.cpu_clk_rst_if.wait_for_reset();
     override_test_status_and_finish(.passed(1'b1));
   endtask
 
