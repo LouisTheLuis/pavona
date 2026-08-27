@@ -22,6 +22,7 @@ module acc_idle_checker
 
   input logic [7:0] status_q_i,
   input logic busy_secure_wipe,
+  input logic locking_i,
   input logic [38:0] imem_rdata_bus,
   input logic [ExtWLEN-1:0] dmem_rdata_bus
 );
@@ -49,7 +50,7 @@ module acc_idle_checker
 
   assign start_req = reg2hw.cmd.qe && cmd_operation;
 
-  assign do_start = start_req && (hw2reg.status.d == acc_pkg::StatusIdle);
+  assign do_start = start_req && (hw2reg.status.d == acc_pkg::StatusIdle) && !locking_i;
 
   // Track whether ACC has completed its initial secure wipe.
   logic init_sec_wipe_done;

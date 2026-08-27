@@ -33,6 +33,7 @@ module acc_bind;
 
     .status_q_i(status_q),
     .busy_secure_wipe,
+    .locking_i(locking),
 
     .imem_rdata_bus(imem_rdata_bus),
     .dmem_rdata_bus(dmem_rdata_bus)
