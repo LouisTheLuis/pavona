@@ -10,7 +10,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
 
   `uvm_object_new
 
-  typedef bit [keymgr_pkg::AdvDataWidth-1:0]                  adv_data_t;
+  typedef bit [keymgr_dpe_pkg::DpeAdvDataWidth-1:0]           adv_data_t;
   typedef bit [kmac_pkg::AppDigestW-1:0]                      digest_t;
   typedef bit [TL_DW-1:0]                                     tl_data_t;
   typedef bit [keymgr_pkg::KeyWidth-1:0]                      key_t;
@@ -32,7 +32,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
 
   typedef struct packed {
     // some portions are unused, which are 0s
-    bit [(keymgr_pkg::AdvDataWidth - keymgr_pkg::KeyWidth - keymgr_pkg::SwBindingWidth) - 1 : 0]
+    bit [(keymgr_dpe_pkg::DpeAdvDataWidth - keymgr_pkg::KeyWidth - keymgr_pkg::SwBindingWidth) - 1 : 0]
                  unused;
     sw_binding_t SoftwareBinding;
     key_t        OwnerSeed;
@@ -40,7 +40,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
 
   typedef struct packed {
     // some portions are unused, which are 0s
-    bit [(keymgr_pkg::AdvDataWidth - keymgr_pkg::SwBindingWidth) - 1 : 0]
+    bit [(keymgr_dpe_pkg::DpeAdvDataWidth - keymgr_pkg::SwBindingWidth) - 1 : 0]
                  unused;
     sw_binding_t SoftwareBinding;
   } adv_sw_data_t;
@@ -77,6 +77,8 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
     // At this point, exactly one key slot should be valid and that key slot should contain the
     // creator root key and be in boot stage 0.  Verify that this holds.
     begin
+      key_shares_t root_key = get_otp_root_key();
+      key_t entropy;
       bit valid_found = 1'b0;
       for (int i = 0; i < keymgr_dpe_pkg::DpeNumSlots; i++) begin
         keymgr_dpe_pkg::keymgr_dpe_slot_t slot = get_key_slot(i);
@@ -88,8 +90,18 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
         end
       end
       `DV_CHECK_EQ(valid_found, 1'b1, "Expecting one valid key slot")
-      `DV_CHECK_EQ(stage_0_key, get_otp_root_key(),
-                   "Expecting boot stage 0 key to equal creator root key (UDS) from OTP")
+      // Validate the root keys: both shares use the same entropy, and we can compute the
+      // otp_root key. The shares values are
+      // stage_0_key[0] = entropy ^ root_key[0]
+      // stage_0_key[1] = entropy ^ root_key[1]
+      // This means the entropy can be computed as stage_0_key[0] ^ root_key[0], and we can
+      // check that stage_0_key[1] ^ entropy == root_key[1].
+      entropy = stage_0_key[0] ^ root_key[0];
+      `DV_CHECK_NE(entropy, '0, "Expected non-zero entropy")
+      `DV_CHECK_EQ(stage_0_key[1] ^ entropy, root_key[1],
+                   "Expecting entropy mask over stage_0_key shares to match")
+      `DV_CHECK_EQ(get_unmasked_key(stage_0_key), get_unmasked_key(root_key),
+                   "Expecting umasked keys of stage_0_key and root_key to match")
     end
     `uvm_info(`gfn, $sformatf("Boot stage 0 key:\n%s", key_shares_str(stage_0_key)), UVM_LOW)
 
@@ -233,16 +245,20 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
 
     // Wait for keymgr_dpe to have advanced to boot stage 3.
     `DV_WAIT(cfg.sw_logger_vif.printed_log == "KeymgrDpe derived boot stage 3 key")
-    // At this point, exactly one key slot should contain the boot stage 3 key.  Verify that this
-    // holds.
+    // At this point, two key slots should be valid with a BootStageRuntime key: the boot stage 2
+    // and the boot stage 3 key. Boot stage 3's key should follow boot stage 2. Verify this holds.
     begin
-     bit key_found = 1'b0;
+     bit key_2_found = 1'b0;
+     bit key_3_found = 1'b0;
      for (int i = 0; i < keymgr_dpe_pkg::DpeNumSlots; i++) begin
        keymgr_dpe_pkg::keymgr_dpe_slot_t slot = get_key_slot(i);
        if (slot.valid && slot.boot_stage == keymgr_dpe_pkg::BootStageRuntime) begin
-         `DV_CHECK_EQ(key_found, 1'b0, "Expecting only one boot stage 3 key")
-         key_found = 1'b1;
-         stage_3_key = slot.key;
+         `DV_CHECK_EQ(key_3_found, 1'b0, "Expecting only one boot stage 3 key")
+         if (key_2_found) begin
+           key_3_found = 1'b1;
+           stage_3_key = slot.key;
+         end
+         key_2_found = 1'b1;
        end
      end
     end
@@ -333,6 +349,8 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
 
     // HardwareRevisionSeed is a netlist constant.
     creator_data.HardwareRevisionSeed = top_dragonfly_rnd_cnst_pkg::RndCnstKeymgrDpeRevisionSeed;
+    `uvm_info(`gfn, $sformatf("HardwareRevisionSeed:\n%s", key_str(creator_data.HardwareRevisionSeed)),
+              UVM_LOW)
 
     // DeviceIdentifier is stored in OTP; (backdoor-)read it from CSRs.
     for (int i = 0; i < keymgr_pkg::DevIdWidth / TL_DW; i++) begin
@@ -346,7 +364,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
     // TODO: We appear to have more life cycle states now.
     creator_data.HealthMeasurement =
         lc_at_prod ? top_dragonfly_rnd_cnst_pkg::RndCnstLcCtrlLcKeymgrDivProduction
-                   : top_dragonfly_rnd_cnst_pkg::RndCnstLcCtrlLcKeymgrDivTestUnlocked;
+                   : top_dragonfly_rnd_cnst_pkg::RndCnstLcCtrlLcKeymgrDivRma;
     `uvm_info(`gfn, $sformatf("HealthMeasurement:\n128'h%032h", creator_data.HealthMeasurement),
               UVM_LOW)
 
@@ -363,7 +381,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
     // CreatorSeed is stored in OTP.
     creator_data.CreatorSeed = get_otp_creator_seed();
 
-    return keymgr_pkg::AdvDataWidth'(creator_data);
+    return keymgr_dpe_pkg::DpeAdvDataWidth'(creator_data);
   endfunction
 
   // Collect data used as 'message' to derive the owner key (boot stage 2).
@@ -383,7 +401,7 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
     // OwnerSeed is stored in OTP.
     owner_data.OwnerSeed = get_otp_owner_seed();
 
-    return keymgr_pkg::AdvDataWidth'(owner_data);
+    return keymgr_dpe_pkg::DpeAdvDataWidth'(owner_data);
   endfunction
 
   // Read OwnerSeed from OTP via backdoor and descramble it.
@@ -393,13 +411,12 @@ class chip_sw_keymgr_dpe_key_derivation_vseq extends chip_sw_base_vseq;
       otp_owner_seed[i * 32 +: 32] =
           cfg.mem_bkdr_util_h[Otp].read32(otp_ctrl_reg_pkg::OwnerSeedOffset + i * 4);
     end
-    `uvm_fatal(`gfn, "OTP Secret3 key required")
     // TODO(#26288): Secret3 present only in Dragonfly.
-    //for (int i = 0; i < otp_ctrl_reg_pkg::OwnerSeedSize / 8; i++) begin
-    //  otp_owner_seed[i * 64 +: 64] =
-    //      otp_scrambler_pkg::descramble_data(otp_owner_seed[i * 64 +: 64],
-    //                                         otp_ctrl_part_pkg::Secret3Idx);
-    //end
+    for (int i = 0; i < otp_ctrl_reg_pkg::OwnerSeedSize / 8; i++) begin
+      otp_owner_seed[i * 64 +: 64] =
+          otp_scrambler_pkg::descramble_data(otp_owner_seed[i * 64 +: 64],
+                                             otp_ctrl_part_pkg::Secret3Idx);
+    end
     `uvm_info(`gfn, $sformatf("OwnerSeed:\n%s", key_str(otp_owner_seed)), UVM_LOW)
     return otp_owner_seed;
   endfunction
