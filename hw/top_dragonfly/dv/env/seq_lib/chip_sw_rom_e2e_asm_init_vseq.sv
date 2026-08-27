@@ -18,7 +18,7 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
   localparam bit [31:0] MMIO_START_ADDRESS               = 32'h21100000;
   localparam bit [31:0] MMIO_END_ADDRESS                 = 32'h30601000;
   localparam bit [31:0] CREATOR_FW_PHY_START_ADDRESS     = 32'h41000000;
-  localparam bit [31:0] CREATOR_FW_PHY_END_ADDRESS       = 32'h41080000;
+  localparam bit [31:0] CREATOR_FW_SIZE_BYTES            = 32'h00080000;
   localparam bit [31:0] ROM_CTRL1_ENTRY_POINT_OFFSET     = 32'h00000180;
 
   function logic [31:0] epmp_addr_napot(logic [31:0] addr, int unsigned length);
@@ -207,7 +207,7 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[10], epmp_addr_tor(MMIO_START_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[11], epmp_addr_tor(MMIO_END_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[13], epmp_addr_napot(CREATOR_FW_PHY_START_ADDRESS,
-                                                            CREATOR_FW_PHY_END_ADDRESS))
+                                                            CREATOR_FW_SIZE_BYTES))
     // PMP NA4 address calculation is the same as the TOR calculation.
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[14], epmp_addr_tor(RAM_STACK_GUARD_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[15],
