@@ -13,7 +13,6 @@
 #include "hw/top/dt/rstmgr.h"
 #include "hw/top/dt/rv_plic.h"
 #include "sw/device/lib/base/macros.h"
-#include "sw/device/lib/base/math.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_aon_timer.h"
@@ -25,6 +24,7 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/alert_handler_testutils.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/FreeRTOSConfig.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -36,8 +36,14 @@ OTTF_DEFINE_TEST_CONFIG();
  * Program the alert handler to escalate on alerts upto phase 2 (i.e. reset) but
  * the phase 1 (i.e. wipe secrets) should occur and last during the time the
  * wdog is programmed to bark.
+ *
+ * The escalation times are controlled by alert_handler's clock; there is a
+ * busy_spin_micros that should not expire unless the test is not working
+ * right, and a watchdog that should not trip either. The delays for all these
+ * must be carefully set, but they are based on the cycles for escalation.
  */
 enum {
+  kMinimumMicros = 5,
   kWdogBarkMicros = 3 * 100,          // 300 us
   kWdogBiteMicros = 4 * 100,          // 400 us
   kEscalationPhase0Micros = 1 * 100,  // 100 us
@@ -151,11 +157,38 @@ void init_peripherals(void) {
                                                 /*threshold=*/0u));
 }
 
-static uint32_t udiv64_slow_into_u32(uint64_t a, uint64_t b,
-                                     uint64_t *rem_out) {
-  const uint64_t result = udiv64_slow(a, b, rem_out);
-  CHECK(result <= UINT32_MAX, "Result of division must fit in uint32_t");
-  return (uint32_t)result;
+// Based on the escalation phase 0, the aon timer bark is set to 1.5
+// the corresponding delay, the bite to twice that amount, and the
+// next escalation phase to 3 times the phase 0 cycles. The wait in
+// micros is set to 1.25 the escalation phase 0.
+static void compute_delays(uint32_t *escalation_0_cycles, uint32_t *bark_cycles,
+                           uint32_t *wait_us) {
+  // Base line is the alert_handler cycles to escalation 0. It should
+  // translate to at least 5 micros.
+  uint32_t proposed_phase_0_cycles = 250;
+  dt_clock_t dt_alert_handler_clk =
+      dt_alert_handler_clock((dt_alert_handler_t)0, kDtAlertHandlerClockClk);
+  CHECK_STATUS_OK(api_testutils_cycles_spanning_micros(
+      dt_alert_handler_clk, proposed_phase_0_cycles, kMinimumMicros,
+      escalation_0_cycles));
+  uint32_t phase_0_micros;
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(
+      dt_alert_handler_clk, *escalation_0_cycles, &phase_0_micros));
+  dt_clock_t dt_aon_clk =
+      dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  // bark_us set to 1.5 phase_0_micros.
+  uint64_t bark_us = (uint64_t)(phase_0_micros + (phase_0_micros >> 1));
+  CHECK_STATUS_OK(
+      api_testutils_get_cycles_32_from_us(dt_aon_clk, bark_us, bark_cycles));
+  LOG_INFO("phase_0_micros %d, bark_us %d (0x%0x%0x), bark_cycles %d",
+           phase_0_micros, (uint32_t)bark_us, (uint32_t)(bark_us >> 32),
+           (uint32_t)bark_us, *bark_cycles);
+  // The phase_0_micros is required to span at least kMinimumMicros.
+  *wait_us = phase_0_micros + (phase_0_micros >> 2);
+  LOG_INFO(
+      "Cycles proposed %d, esc_0 %d, micros %d, wait_micros %d, bark_cycles %d",
+      proposed_phase_0_cycles, *escalation_0_cycles, phase_0_micros, *wait_us,
+      *bark_cycles);
 }
 
 /**
@@ -163,7 +196,7 @@ static uint32_t udiv64_slow_into_u32(uint64_t a, uint64_t b,
  * the phase 1 (i.e. wipe secrets) should occur and last during the time the
  * wdog is programed to bark.
  */
-static void alert_handler_config(void) {
+static void alert_handler_config(uint32_t escalation_0_cycles) {
   dif_alert_handler_alert_t alerts[] = {
       dt_pwrmgr_alert_to_alert_id(kDtPwrmgrAon, kDtPwrmgrAlertFatalFault)};
   dif_alert_handler_class_t alert_classes[] = {kDifAlertHandlerClassA};
@@ -171,22 +204,18 @@ static void alert_handler_config(void) {
   dif_alert_handler_escalation_phase_t esc_phases[] = {
       {.phase = kDifAlertHandlerClassStatePhase0,
        .signal = 0,
-       .duration_cycles = udiv64_slow_into_u32(
-           kEscalationPhase0Micros * kClockFreqPeripheralHz, 1000000, NULL)},
+       .duration_cycles = escalation_0_cycles},
       {.phase = kDifAlertHandlerClassStatePhase1,
        .signal = 1,
-       .duration_cycles = udiv64_slow_into_u32(
-           kEscalationPhase1Micros * kClockFreqPeripheralHz, 1000000, NULL)},
+       .duration_cycles = 4 * escalation_0_cycles},
       {.phase = kDifAlertHandlerClassStatePhase2,
        .signal = 3,
-       .duration_cycles = udiv64_slow_into_u32(
-           kEscalationPhase2Micros * kClockFreqPeripheralHz, 1000000, NULL)}};
+       .duration_cycles = escalation_0_cycles}};
 
   dif_alert_handler_class_config_t class_config[] = {{
       .auto_lock_accumulation_counter = kDifToggleDisabled,
       .accumulator_threshold = 0,
-      .irq_deadline_cycles =
-          udiv64_slow_into_u32(10 * kClockFreqPeripheralHz, 1000000, NULL),
+      .irq_deadline_cycles = escalation_0_cycles,
       .escalation_phases = esc_phases,
       .escalation_phases_len = ARRAYSIZE(esc_phases),
       .crashdump_escalation_phase = kDifAlertHandlerClassStatePhase3,
@@ -213,18 +242,11 @@ static void alert_handler_config(void) {
 /**
  * Execute the aon timer interrupt test.
  */
-static void execute_test(dif_aon_timer_t *aon_timer) {
-  uint32_t bark_cycles = 0;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(kWdogBarkMicros,
-                                                                &bark_cycles));
-  uint32_t bite_cycles = 0;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(kWdogBiteMicros,
-                                                                &bite_cycles));
-
-  LOG_INFO(
-      "Wdog will bark after %u/%u us/cycles and bite after %u/%u us/cycles",
-      (uint32_t)kWdogBarkMicros, bark_cycles, (uint32_t)kWdogBiteMicros,
-      bite_cycles);
+static void execute_test(dif_aon_timer_t *aon_timer, uint32_t bark_cycles,
+                         uint32_t wait_micros) {
+  uint32_t bite_cycles = 2 * bark_cycles;
+  LOG_INFO("Wdog will bark after %u cycles and bite after %u cycles",
+           bark_cycles, bite_cycles);
 
   // Setup the wdog bark and bite timeouts.
   CHECK_STATUS_OK(
@@ -234,7 +256,7 @@ static void execute_test(dif_aon_timer_t *aon_timer) {
   // Trigger the alert handler to escalate.
   dif_pwrmgr_alert_t alert = kDifPwrmgrAlertFatalFault;
   CHECK_DIF_OK(dif_pwrmgr_alert_force(&pwrmgr, alert));
-  busy_spin_micros(kEscalationPhase0MicrosCpu);
+  busy_spin_micros(wait_micros);
 
   // This should never run since escalation turns the CPU off.
   CHECK(false, "The alert handler failed to escalate");
@@ -266,7 +288,12 @@ bool test_main(void) {
         &plic, alert_irq_ids[i], kDtRvPlicTargetIbex0, kDifToggleEnabled));
   }
 
-  alert_handler_config();
+  uint32_t escalation_0_cycles;
+  uint32_t bark_cycles;
+  uint32_t wait_micros;
+  compute_delays(&escalation_0_cycles, &bark_cycles, &wait_micros);
+
+  alert_handler_config(escalation_0_cycles);
 
   // Check if there was a HW reset caused by the escalation.
   dif_rstmgr_reset_info_bitfield_t rst_info;
@@ -279,7 +306,7 @@ bool test_main(void) {
 
   if (rst_info == kDifRstmgrResetInfoPor) {
     LOG_INFO("Booting for the first time, starting test");
-    execute_test(&aon_timer);
+    execute_test(&aon_timer, bark_cycles, wait_micros);
   } else if (rst_info == kDifRstmgrResetInfoEscalation) {
     LOG_INFO("Booting for the second time due to escalation reset");
 

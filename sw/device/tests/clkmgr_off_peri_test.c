@@ -15,6 +15,7 @@
 #include "sw/device/lib/dif/dif_usbdev.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/ret_sram_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -24,6 +25,17 @@
 #include "hw/top/uart_regs.h"
 #include "hw/top/usbdev_regs.h"
 #include "hw/top_egret/sw/autogen/top_egret.h"
+
+enum {
+  /**
+   * The minimum microseconds spanned by the watchdog bite cycles.
+   */
+  kMinimumMicros = 50,
+  /**
+   * The minimum number of bite aon cycles.
+   */
+  kMinBiteCycles = 50
+};
 
 static const dt_pwrmgr_t kPwrmgrDt = 0;
 static_assert(kDtPwrmgrCount == 1, "this test expects a pwrmgr");
@@ -107,10 +119,13 @@ static void test_gateable_clocks_off(const dif_clkmgr_t *clkmgr,
            peri_context[clock].peripheral_name);
 
   // Bite after enough time has elapsed past the hung csr access.
-  uint32_t bite_us = (kDeviceType == kDeviceSimDV) ? 400 : 800;
-  uint32_t bite_cycles = 0;
+  uint32_t proposed_bite_cycles = kMinBiteCycles;
+  uint32_t bite_cycles;
+  CHECK_STATUS_OK(aon_timer_testutils_aon_cycles_spanning_micros(
+      proposed_bite_cycles, kMinimumMicros, &bite_cycles));
+  uint32_t bite_us;
   CHECK_STATUS_OK(
-      aon_timer_testutils_get_aon_cycles_32_from_us(bite_us, &bite_cycles));
+      aon_timer_testutils_get_us_from_aon_cycles(bite_cycles, &bite_us));
   LOG_INFO("Setting bite reset for %u us (%u cycles)", bite_us, bite_cycles);
 
   // Make sure the CSR is accessible before turning the clock off.
@@ -124,7 +139,7 @@ static void test_gateable_clocks_off(const dif_clkmgr_t *clkmgr,
   CHECK_DIF_OK(
       dif_clkmgr_gateable_clock_set_enabled(clkmgr, clock, kDifToggleDisabled));
   // Wait for the clock to really turn off.
-  busy_spin_micros(100);
+  busy_spin_micros(bite_us >> 1);
   // And issue the CSR access that will freeze and cause a reset.
   (*peri_context[clock].csr_access)();
 }

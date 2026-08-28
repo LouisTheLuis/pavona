@@ -13,6 +13,7 @@
 #include "sw/device/lib/dif/dif_rstmgr.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/pwrmgr_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -27,13 +28,9 @@ static_assert(kDtAonTimerCount == 1,
               "this library expects exactly one aon_timer");
 
 OTTF_DEFINE_TEST_CONFIG();
+
 // This test needs to work for tops with different clock frequencies.
-// Slow tops like egret take 5us per aon clock cycle, while faster ones
-// like dragonfly take 16ns per aon cycle. On the other hand, the test
-// uses busy_spin_micros, which counts in microseconds.
-// The strategy this test uses to deal with this is to specify the bark
-// and bite times in aon clock cycles, except the resulting time must
-// exceed 5us.
+// It computes all times and their constraints based on cycles.
 
 enum {
   /**
@@ -45,6 +42,13 @@ enum {
    * The minimum number of aon cycles for the same.
    */
   kMinimumAonCycles = 20,
+
+  /**
+   * The number of cycles for interrupt to trip.
+   * The `intr_state` takes 3 aon clock cycles to rise plus 2 extra cycles as a
+   * precaution.
+   */
+  kIntrSetAonCycles = 3 + 2,
 };
 
 static dif_pwrmgr_request_sources_t wakeup_sources;
@@ -103,30 +107,16 @@ static void sleep_wdog_bite_test(const dif_aon_timer_t *aon_timer,
   CHECK(false, "Fail to enter in low power mode!");
 }
 
-static uint32_t compute_bark_aon_cycles(void) {
-  uint32_t bark_aon_cycles = kMinimumAonCycles;
-  uint32_t aon_cycles_for_min_micros;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(
-      kMinimumNumMicros, &aon_cycles_for_min_micros));
-  if (bark_aon_cycles < aon_cycles_for_min_micros) {
-    bark_aon_cycles = aon_cycles_for_min_micros;
-  }
-  return bark_aon_cycles;
-}
-
 static uint32_t compute_wait_us(uint32_t bark_aon_cycles) {
   uint32_t bark_time_us;
-  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(bark_aon_cycles,
-                                                             &bark_time_us));
+  dt_clock_t dt_aon_clk =
+      dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(dt_aon_clk, bark_aon_cycles,
+                                                   &bark_time_us));
   LOG_INFO("bark_time_us = %d", bark_time_us);
-  // The `intr_state` takes 3 aon clock cycles to rise plus 2 extra cycles as a
-  // precaution.
   uint32_t extra_time_us;
-  CHECK_STATUS_OK(
-      aon_timer_testutils_get_us_from_aon_cycles(3 + 2, &extra_time_us));
-  if (extra_time_us == 0) {
-    extra_time_us = 1;
-  }
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(
+      dt_aon_clk, kIntrSetAonCycles, &extra_time_us));
   uint32_t wait_us = bark_time_us + extra_time_us;
   LOG_INFO("wait_us = %d", wait_us);
   return wait_us;
@@ -153,7 +143,9 @@ bool test_main(void) {
   dif_aon_timer_t aon_timer;
   CHECK_DIF_OK(dif_aon_timer_init_from_dt(kAonTimerDt, &aon_timer));
 
-  uint32_t bark_aon_cycles = compute_bark_aon_cycles();
+  uint32_t bark_aon_cycles;
+  CHECK_STATUS_OK(aon_timer_testutils_aon_cycles_spanning_micros(
+      kMinimumAonCycles, (uint64_t)kMinimumNumMicros, &bark_aon_cycles));
   uint32_t wait_us = compute_wait_us(bark_aon_cycles);
 
   // Check if there was a HW reset caused by the wdog bite.

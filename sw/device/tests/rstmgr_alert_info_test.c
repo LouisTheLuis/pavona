@@ -30,6 +30,7 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/alert_handler_testutils.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/ret_sram_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/rv_plic_testutils.h"
@@ -95,15 +96,13 @@
 OTTF_DEFINE_TEST_CONFIG();
 
 enum {
-  kWdogBarkMicros = 200,          // us
-  kWdogBiteMicros = 200,          // us
-  kEscalationPhase0Micros = 300,  // us
-  kEscalationPhase1Micros = 200,  // us
-  kEscalationPhase2Micros = 100,  // us
-  kRoundOneDelay = 100,           // us
-  kRoundTwoDelay = 100,           // us
-  kRoundThreeDelay = 1000,        // us
-  kEventCounter = 0               // the retention sram counter tracking events
+  // This assumes the ISR will consume no more than 1000 AON cycles,
+  // and that is generous.
+  kWdogBarkCPUCycles = 1000,
+  kRoundOneDelay = 100,     // us
+  kRoundTwoDelay = 100,     // us
+  kRoundThreeDelay = 1000,  // us
+  kEventCounter = 0         // the retention sram counter tracking events
 };
 
 static const uint32_t kPlicTarget = 0;
@@ -353,17 +352,12 @@ void ottf_external_isr(uint32_t *exc_info) {
         LOG_INFO("IRQ: class A");
         CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
             &alert_handler, kDifI2cAlertFatalFault));
-
-        // check classes
-        dif_alert_handler_class_state_t state;
-        CHECK_DIF_OK(dif_alert_handler_get_class_state(
-            &alert_handler, kDifAlertHandlerClassA, &state));
+        CHECK_DIF_OK(dif_alert_handler_irq_acknowledge(&alert_handler, irq));
 
         // sw reset for round 1
         if (global_test_round == kRound1) {
           CHECK_DIF_OK(dif_rstmgr_software_device_reset(&rstmgr));
         }
-        CHECK_DIF_OK(dif_alert_handler_irq_acknowledge(&alert_handler, irq));
 
         break;
       case kDtAlertHandlerIrqClassb:
@@ -711,6 +705,26 @@ static void init_expected_cause(void) {
   expected_info[kRound3].alert_info.alert_cause[spi_alert_id] = 1;
 }
 
+// Convert the cpu cycles to aon cycles, and configure the
+// watchdog. Don't accept less than 2 cycles since we could end up
+// with a fraction of one cycle if the timer is set close to an aon
+// clock edge.
+void configure_watchdog_from_cpu_cycles(uint32_t bark_cpu_cycles) {
+  uint32_t bark_aon_cycles;
+  CHECK_STATUS_OK(api_testutils_convert_cycles(
+      dt_rv_core_ibex_clock(kRvCoreIbexDt, kDtRvCoreIbexClockClk),
+      dt_aon_timer_clock(kAonTimerDt, kDtAonTimerClockAon), bark_cpu_cycles,
+      &bark_aon_cycles));
+  CHECK(bark_aon_cycles > 0);
+  if (bark_aon_cycles < 2) {
+    bark_aon_cycles = 2;
+  }
+  LOG_INFO("Configuring watchdog with %d barb and %d bite cycles",
+           bark_aon_cycles, 2 * bark_aon_cycles);
+  CHECK_STATUS_OK(aon_timer_testutils_watchdog_config(
+      &aon_timer, bark_aon_cycles, 2 * bark_aon_cycles, false));
+}
+
 bool test_main(void) {
   uint32_t event_idx = 0;
 
@@ -789,7 +803,7 @@ bool test_main(void) {
     CHECK_DIF_OK(dif_alert_handler_irq_set_enabled(
         &alert_handler, kDifAlertHandlerIrqClassa, kDifToggleEnabled));
 
-    // Give an enough delay until sw rest happens.
+    // Allow enough delay before checking sw reset happened.
     busy_spin_micros(kRoundOneDelay);
     CHECK(false, "Should have reset before this line");
   } else {
@@ -805,13 +819,7 @@ bool test_main(void) {
       global_test_round = kRound2;
       prgm_alert_handler_round2();
 
-      // Setup the aon_timer the wdog bark and bite timeouts.
-      uint32_t bark_cycles = (uint32_t)udiv64_slow(
-          kWdogBarkMicros * kClockFreqAonHz, 1000000, NULL);
-      uint32_t bite_cycles = (uint32_t)udiv64_slow(
-          kWdogBiteMicros * kClockFreqAonHz, 1000000, NULL);
-      CHECK_STATUS_OK(aon_timer_testutils_watchdog_config(
-          &aon_timer, bark_cycles, bite_cycles, false));
+      configure_watchdog_from_cpu_cycles(kWdogBarkCPUCycles);
 
       for (dt_uart_t uart = 0; uart < kDtUartCount; uart++) {
         dif_uart_t uart_dif;

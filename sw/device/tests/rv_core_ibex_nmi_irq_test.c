@@ -45,15 +45,17 @@ static dif_alert_handler_t alert_handler;
 static dt_pwrmgr_t kPwrmgrDt = kDtPwrmgrAon;
 
 /**
- * Program the alert handler to escalate on alerts upto phase 2 (i.e. reset)
+ * Program the alert handler to escalate on alerts up to phase 2 (i.e. reset)
  * but at the phase 1 (i.e. wipe secrets) the NMI interrupt handler should clear
  * the escalation.
+ * The times for the alert handler and aon timer don't overlap, so the values
+ * are mutually independent.
  */
 enum {
-  kEscalationPhase0Micros = 100 * 1000,  // 100 ms
-  kEscalationPhase2Micros = 100,         // 100 us
-  kIrqDeadlineMicros = 10,               // 10 us
-  kWdogBarkMicros = 500,                 // 500 us
+  kEscalationPhase0Cycles = 1000,
+  kEscalationPhase2Cycles = 1000,
+  kIrqDeadlineCycles = 1000,
+  kWdogBarkCycles = 100,
 };
 
 /**
@@ -62,24 +64,17 @@ enum {
 const int kNumTestIterations = 3;
 
 static void alert_handler_config(void) {
-  uint32_t cycles[3] = {0};
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase0Micros, &cycles[0]));
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase2Micros, &cycles[1]));
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(kIrqDeadlineMicros,
-                                                             &cycles[2]));
   dif_alert_handler_escalation_phase_t esc_phases[] = {
       {.phase = kDifAlertHandlerClassStatePhase0,
        .signal = 0,
-       .duration_cycles = cycles[0]},
+       .duration_cycles = kEscalationPhase0Cycles},
       {.phase = kDifAlertHandlerClassStatePhase2,
        .signal = 3,
-       .duration_cycles = cycles[1]}};
+       .duration_cycles = kEscalationPhase2Cycles}};
   dif_alert_handler_class_config_t class_config[] = {{
       .auto_lock_accumulation_counter = kDifToggleDisabled,
       .accumulator_threshold = 0,
-      .irq_deadline_cycles = cycles[2],
+      .irq_deadline_cycles = kIrqDeadlineCycles,
       .escalation_phases = esc_phases,
       .escalation_phases_len = ARRAYSIZE(esc_phases),
       .crashdump_escalation_phase = kDifAlertHandlerClassStatePhase3,
@@ -160,16 +155,15 @@ static void wdog_nmi_test(void) {
   nmi_state = (dif_rv_core_ibex_nmi_state_t){0};
 
   // Setup the wdog bark interrupt.
-  uint32_t count_cycles = 0;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(kWdogBarkMicros,
-                                                                &count_cycles));
   CHECK_STATUS_OK(
-      aon_timer_testutils_watchdog_config(&aon_timer,
-                                          /*bark_cycles=*/count_cycles,
+      aon_timer_testutils_watchdog_config(&aon_timer, kWdogBarkCycles,
                                           /*bite_cycles=*/UINT32_MAX,
                                           /*pause_in_sleep=*/false));
+  uint32_t wait_micros;
+  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(
+      kWdogBarkCycles * 2, &wait_micros));
   LOG_INFO("Wait for aon_timer NMI");
-  IBEX_SPIN_FOR(nmi_fired, kWdogBarkMicros * 2);
+  IBEX_SPIN_FOR(nmi_fired, wait_micros);
 
   // We expect the watchdog bark interrupt to be pending on the peripheral side.
   CHECK(irq_is_pending, "Expected watchdog bark interrupt to be pending");
@@ -189,6 +183,7 @@ static void wdog_nmi_test(void) {
         "wdog_enable:%x\n\twdog_raised:%"
         "x\n",
         nmi_state.wdog_enabled, nmi_state.wdog_barked);
+  LOG_INFO("wdog_nmi_test done");
 }
 
 /**
@@ -205,9 +200,12 @@ static void alert_handler_nmi_test(void) {
   // Trigger the alert handler to escalate.
   CHECK_DIF_OK(dif_pwrmgr_alert_force(&pwrmgr, kDifPwrmgrAlertFatalFault));
 
+  uint32_t wait_micros;
+  CHECK_STATUS_OK(alert_handler_testutils_get_us_from_cycles(
+      kEscalationPhase0Cycles, &wait_micros));
   LOG_INFO("Wait for alert NMI");
-  IBEX_SPIN_FOR(nmi_fired, kEscalationPhase0Micros);
-
+  IBEX_SPIN_FOR(nmi_fired, wait_micros + 1);
+  LOG_INFO("NMI fired");
   // We expect class A to be in escalation phase 0 at this point.
   CHECK(alert_state == kDifAlertHandlerClassStatePhase0,
         "Alert handler class A is expected to be in phase 0.");
@@ -226,6 +224,7 @@ static void alert_handler_nmi_test(void) {
         "Alert handler NMI state not expected:\n\t"
         "alert_enable:%x\n\talert_raised:%x\n",
         nmi_state.alert_enabled, nmi_state.alert_raised);
+  LOG_INFO("alert_handler_nmi_test done");
 }
 
 /**

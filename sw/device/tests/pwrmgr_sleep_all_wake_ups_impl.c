@@ -43,6 +43,7 @@ static const uint32_t kSensorCtrlEventIdx = 0;
 
 enum {
   kPlicTarget = 0,
+  kWakeupAonCycles = 10,
 };
 
 static const dt_pwrmgr_t kPwrmgrDt = 0;
@@ -264,11 +265,12 @@ static void usb_wakeup_clear(dt_pwrmgr_wakeup_src_t src) {
 
 /**
  * aon timer config for test #5
- * set wakeup signal in 50us
+ * set wakeup signal at kWakeupAonCycles
  */
 static void aontimer_wakeup_config(dt_pwrmgr_wakeup_src_t src) {
   INIT_DIF_DT(aon_timer, src, aon_timer)
-  CHECK_STATUS_OK(aon_timer_testutils_wakeup_config(&aon_timer, 10));
+  CHECK_STATUS_OK(
+      aon_timer_testutils_wakeup_config(&aon_timer, kWakeupAonCycles));
 }
 
 static void aontimer_wakeup_check(dt_pwrmgr_wakeup_src_t src) {

@@ -69,7 +69,6 @@
 
 /**
  * Same as `OTTF_BACKDOOR_VAR` but for DV environments.
- * ```
  */
 #define OTTF_BACKDOOR_VAR_DV OT_USED OT_SECTION(".rodata")
 

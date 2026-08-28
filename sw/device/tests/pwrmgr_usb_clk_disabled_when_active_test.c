@@ -13,6 +13,7 @@
 #include "sw/device/lib/dif/dif_usbdev.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/pwrmgr_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -65,11 +66,8 @@ bool test_main(void) {
     usbdev_csr_access();
 
     // Bite after enough time has elapsed past the hung csr access.
-    uint32_t bite_us = (kDeviceType == kDeviceSimDV) ? 400 : 800;
-    uint32_t bite_cycles = 0;
-    CHECK_STATUS_OK(
-        aon_timer_testutils_get_aon_cycles_32_from_us(bite_us, &bite_cycles));
-    LOG_INFO("Setting bite reset for %u us (%u cycles)", bite_us, bite_cycles);
+    uint32_t bite_cycles = (kDeviceType == kDeviceSimDV) ? 80 : 160;
+    LOG_INFO("Setting bite reset for %u aon cycles", bite_cycles);
 
     // Set bite timer.
     CHECK_STATUS_OK(aon_timer_testutils_watchdog_config(&aon_timer, UINT32_MAX,

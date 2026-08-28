@@ -13,6 +13,7 @@
 #include "sw/device/lib/dif/dif_rstmgr.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/pwrmgr_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -46,6 +47,13 @@ enum {
    * The minimum number of aon cycles for the same.
    */
   kMinimumAonCycles = 20,
+
+  /**
+   * The number of cycles for interrupt to trip.
+   * The `intr_state` takes 3 aon clock cycles to rise plus 2 extra cycles as a
+   * precaution.
+   */
+  kIntrSetAonCycles = 3 + 2,
 };
 
 /**
@@ -75,27 +83,20 @@ static void config_wdog(const dif_aon_timer_t *aon_timer,
  */
 static void wdog_bite_test(const dif_aon_timer_t *aon_timer,
                            const dif_pwrmgr_t *pwrmgr) {
-  uint32_t bark_aon_cycles = kMinimumAonCycles;
-  uint32_t aon_cycles_for_min_micros;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(
-      kMinimumNumMicros, &aon_cycles_for_min_micros));
-  if (bark_aon_cycles < aon_cycles_for_min_micros) {
-    bark_aon_cycles = aon_cycles_for_min_micros;
-  }
+  uint32_t bark_aon_cycles;
+  CHECK_STATUS_OK(api_testutils_cycles_spanning_micros(
+      kDtClockAon, kMinimumAonCycles, (uint64_t)kMinimumNumMicros,
+      &bark_aon_cycles));
   uint32_t bark_time_us;
-  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(bark_aon_cycles,
-                                                             &bark_time_us));
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(kDtClockAon, bark_aon_cycles,
+                                                   &bark_time_us));
   LOG_INFO("bark_time_us = %d", bark_time_us);
   config_wdog(aon_timer, pwrmgr, bark_aon_cycles, 2 * bark_aon_cycles);
 
-  // The `intr_state` takes 3 aon clock cycles to rise plus 2 extra cycles as a
-  // precaution.
+  // Get the extra time to allow the interrupt to be raised in aon cycles.
   uint32_t extra_time_us;
-  CHECK_STATUS_OK(
-      aon_timer_testutils_get_us_from_aon_cycles(3 + 2, &extra_time_us));
-  if (extra_time_us == 0) {
-    extra_time_us = 1;
-  }
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(
+      kDtClockAon, kIntrSetAonCycles, &extra_time_us));
   uint32_t wait_us = bark_time_us + extra_time_us;
   LOG_INFO("wait_us = %d", wait_us);
   // Wait bark time and check that the bark interrupt requested.

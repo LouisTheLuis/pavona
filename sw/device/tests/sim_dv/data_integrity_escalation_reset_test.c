@@ -86,6 +86,7 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/alert_handler_testutils.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/rand_testutils.h"
 #include "sw/device/lib/testing/ret_sram_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
@@ -141,33 +142,18 @@ enum {
  * - bite after escalation reset, so we should not get timer reset.
  */
 enum {
-  // Note that the escalation phase times below define the length of each phase,
-  // not when they start.
-  // The starting time is given by the aggregate of previous phase lengths, and
-  // is noted with @ below.
-  // @0 us -> in this phase we will not do anything so that the exception
-  // handlers have time to execute.
-  kEscalationPhase0Micros = 400,
-  // @400 us -> in this phase we will raise an NMI
-  kEscalationPhase1Micros = 400,
-  // @800 us -> in this phase we will assert lc_escalate_en
-  kEscalationPhase2Micros = 200,
-  // @1000 us -> in this phase we will reset the chip
-  kEscalationPhase3Micros = 200,
-  // These are set so that both events happen in Phase2 of the escalation
-  // protocol, which asserts lc_escalate_en. That should prevent the Wdog
-  // from running and sending out an NMI on its own (we check in the NMI
-  // handler below that this does not happen).
-  kWdogBarkMicros = 850,
-  kWdogBiteMicros = 900,
+  // This is the minimum number of aon cycles spanned by each escalation phase.
+  kMinimumAonCycles = 17,
+  // Note that kEscalationPhaseCycles below define the length of each phase,
+  // not when they start. The phase length needs to be enough for any
+  // activity done in that phase. The duration of phase 3 is almost arbitrary
+  // since it just triggers reset.
+  // The starting cycle is given by the aggregate of previous phase lengths.
+  kEscalationPhaseCycles = 1000,
+  kEscalationPhase3Cycles = 400,
   // We expect exactly one reset
   kMaxResets = 1,
 };
-
-static_assert(
-    kWdogBarkMicros<kWdogBiteMicros && kWdogBarkMicros>(
-        kEscalationPhase0Micros + kEscalationPhase1Micros),
-    "The wdog bite shall after the NMI phase when lc_escalate_en is asserted.");
 
 /**
  * Objects to access the peripherals used in this test via dif API.
@@ -347,35 +333,24 @@ static void init_peripherals(void) {
  * Program the alert handler to escalate on alerts and reset on phase 3,
  * and to start escalation after observing 1 alert event.
  */
-static void alert_handler_config(void) {
+static void alert_handler_config(uint32_t escalation_phase_cycles) {
   alert_class_to_use = (dif_alert_handler_class_t)rand_testutils_gen32_range(
       kDtAlertHandlerIrqClassa, kDtAlertHandlerIrqClassd);
   dif_alert_handler_alert_t alerts[] = {kExpectedAlertNumber};
   dif_alert_handler_class_t alert_classes[] = {alert_class_to_use};
-
-  uint32_t cycles[4] = {0};
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase0Micros, &cycles[0]));
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase1Micros, &cycles[1]));
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase2Micros, &cycles[2]));
-  CHECK_STATUS_OK(alert_handler_testutils_get_cycles_from_us(
-      kEscalationPhase3Micros, &cycles[3]));
-
   dif_alert_handler_escalation_phase_t esc_phases[] = {
       {.phase = kDifAlertHandlerClassStatePhase0,
        .signal = 0xFFFFFFFF,  // do not trigger any signal, just wait.
-       .duration_cycles = cycles[0]},
+       .duration_cycles = escalation_phase_cycles},
       {.phase = kDifAlertHandlerClassStatePhase1,
        .signal = 0,  // NMI
-       .duration_cycles = cycles[1]},
+       .duration_cycles = escalation_phase_cycles},
       {.phase = kDifAlertHandlerClassStatePhase2,
        .signal = 1,  // lc_escalate_en
-       .duration_cycles = cycles[2]},
+       .duration_cycles = escalation_phase_cycles},
       {.phase = kDifAlertHandlerClassStatePhase3,
        .signal = 3,  // reset
-       .duration_cycles = cycles[3]}};
+       .duration_cycles = kEscalationPhase3Cycles}};
 
   // This test does not leverage the IRQ timeout feature of the alert
   // handler, hence deadline_cycles is set to zero. Rather, it triggers
@@ -420,18 +395,36 @@ static void alert_handler_config(void) {
       &alert_handler, kDifAlertHandlerIrqClassd, kDifToggleEnabled));
 }
 
-static void set_aon_timers(void) {
-  uint32_t bark_cycles = 0;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(kWdogBarkMicros,
-                                                                &bark_cycles));
-  uint32_t bite_cycles = 0;
-  CHECK_STATUS_OK(aon_timer_testutils_get_aon_cycles_32_from_us(kWdogBiteMicros,
-                                                                &bite_cycles));
-
-  LOG_INFO(
-      "Wdog will bark after %u us (%u cycles) and bite after %u us (%u cycles)",
-      (uint32_t)kWdogBarkMicros, bark_cycles, (uint32_t)kWdogBiteMicros,
-      bite_cycles);
+// The watchdog bark and bite times are computed based on the cycles consumed
+// by the various phases. These cycles correspond to the alert handler's clock,
+// so they need to be converted to the corresponding aon timer's clock that
+// drives the watchdog, which is the aon clock.
+// This configures the watchdog to bark and bite during the second phase.
+static void set_aon_timers(uint32_t escalation_phase_cycles) {
+  dt_clock_t dt_alert_handler_clk =
+      dt_alert_handler_clock(kDtAlertHandler, kDtAlertHandlerClockClk);
+  dt_clock_t dt_aon_timer_aon_clk =
+      dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  // The start of a phase is determined by the accumulated duration of all
+  // previous phases.
+  uint32_t esc2_start_alert_handler_cycles = 2 * escalation_phase_cycles;
+  uint32_t esc3_start_alert_handler_cycles = 3 * escalation_phase_cycles;
+  uint32_t esc2_start_aon_cycles;
+  CHECK_STATUS_OK(api_testutils_convert_cycles(
+      dt_alert_handler_clk, dt_aon_timer_aon_clk,
+      esc2_start_alert_handler_cycles, &esc2_start_aon_cycles));
+  uint32_t esc3_start_aon_cycles;
+  CHECK_STATUS_OK(api_testutils_convert_cycles(
+      dt_alert_handler_clk, dt_aon_timer_aon_clk,
+      esc3_start_alert_handler_cycles, &esc3_start_aon_cycles));
+  uint32_t esc2_phase_aon_span = esc3_start_aon_cycles - esc2_start_aon_cycles;
+  CHECK(esc2_phase_aon_span >= kMinimumAonCycles,
+        "The escalation phase 2 span is %d aon cycles, which is too short",
+        esc2_phase_aon_span);
+  uint32_t bark_cycles = esc2_start_aon_cycles + 4;
+  uint32_t bite_cycles = esc3_start_aon_cycles + 4;
+  LOG_INFO("Wdog will bark after %u cycles and bite after %u cycles",
+           bark_cycles, bite_cycles);
 
   // Setup the wdog bark and bite timeouts.
   CHECK_STATUS_OK(
@@ -446,7 +439,24 @@ static void set_aon_timers(void) {
  * precedence.
  */
 static void execute_test(void) {
-  alert_handler_config();
+  // Constrain the escalation times to span at least kMinimumAonCycles.
+  // Translate the aon cycles to microseconds.
+  uint32_t micros_for_aon;
+  CHECK_STATUS_OK(aon_timer_testutils_get_us_from_aon_cycles(kMinimumAonCycles,
+                                                             &micros_for_aon));
+  uint32_t escalation_phase_cycles;
+  dt_clock_t dt_alert_handler_clk =
+      dt_alert_handler_clock(kDtAlertHandler, kDtAlertHandlerClockClk);
+  CHECK_STATUS_OK(api_testutils_cycles_spanning_micros(
+      dt_alert_handler_clk, kEscalationPhaseCycles, (uint64_t)micros_for_aon,
+      &escalation_phase_cycles));
+  uint32_t escalation_micros;
+  CHECK_STATUS_OK(api_testutils_get_us_from_cycles(
+      dt_alert_handler_clk, (uint64_t)escalation_phase_cycles,
+      &escalation_micros));
+  LOG_INFO("Each escalation phase has %d cycles, about %d microseconds",
+           escalation_phase_cycles, escalation_micros);
+  alert_handler_config(escalation_phase_cycles);
 
   // Make sure we can receive both the watchdog and alert NMIs.
   CHECK_DIF_OK(
@@ -454,7 +464,7 @@ static void execute_test(void) {
   CHECK_DIF_OK(
       dif_rv_core_ibex_enable_nmi(&rv_core_ibex, kDifRvCoreIbexNmiSourceWdog));
 
-  set_aon_timers();
+  set_aon_timers(escalation_phase_cycles);
 
   // 2 is an instruction fault on main SRAM.
   if (kFaultTarget == kFaultTargetMainSramInstr) {

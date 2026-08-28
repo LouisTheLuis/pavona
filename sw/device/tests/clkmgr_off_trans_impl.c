@@ -17,6 +17,7 @@
 #include "sw/device/lib/dif/dif_rv_core_ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
@@ -39,6 +40,17 @@ static_assert(kDtAccCount >= 1, "This test requires at least one ACC instance");
 static_assert(kDtPwrmgrCount == 1, "this test expects exactly one pwrmgr");
 static_assert(kDtRstmgrCount >= 1,
               "This test requires at least one Rstmgr instance");
+
+enum {
+  /**
+   * The minimum microseconds spanned by the watchdog bite cycles.
+   */
+  kMinimumMicros = 50,
+  /**
+   * The minimum number of bite aon cycles.
+   */
+  kMinBiteCycles = 50
+};
 
 static const dt_aes_t kTestAes = (dt_aes_t)0;
 static const dt_aon_timer_t kAonTimerDt = (dt_aon_timer_t)0;
@@ -165,13 +177,18 @@ static void test_hintable_clocks_off(const dif_clkmgr_t *clkmgr,
 
   // Set the watchdog with some time to run the necessary code before the
   // access that should hang.
-  uint32_t bite_us = 20;
-  uint32_t bite_cycles = 0;
+  uint32_t proposed_bite_cycles = kMinBiteCycles;
+  uint32_t bite_cycles;
+  CHECK_STATUS_OK(aon_timer_testutils_aon_cycles_spanning_micros(
+      proposed_bite_cycles, kMinimumMicros, &bite_cycles));
+  uint32_t bite_us;
   CHECK_STATUS_OK(
-      aon_timer_testutils_get_aon_cycles_32_from_us(bite_us, &bite_cycles));
+      aon_timer_testutils_get_us_from_aon_cycles(bite_cycles, &bite_us));
   LOG_INFO("Setting bite reset for %u us (%u cycles)", bite_us, bite_cycles);
   CHECK_STATUS_OK(aon_timer_testutils_watchdog_config(&aon_timer, UINT32_MAX,
                                                       bite_cycles, false));
+  // Wait for the clock to really turn off.
+  busy_spin_micros(bite_us >> 1);
   // This should hang.
   crash_fn();
   LOG_ERROR("Access to disabled unit should freeze and cause a reset");
