@@ -86,6 +86,18 @@ cc_library(
 )
 
 cc_library(
+    name = "api_testutils",
+    srcs = ["api_testutils.c"],
+    hdrs = ["api_testutils.h"],
+    target_compatible_with = [PAVONA_CPU],
+    deps = [
+        "//hw/top/dt",
+        "//sw/device/lib/base:math",
+        "//sw/device/lib/testing/test_framework:check",
+    ],
+)
+
+cc_library(
     name = "binary_blob",
     hdrs = ["binary_blob.h"],
     deps = [
