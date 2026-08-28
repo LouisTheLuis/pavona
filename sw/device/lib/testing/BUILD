@@ -67,6 +67,7 @@ cc_library(
         "//sw/device/lib/dif:alert_handler",
         "//sw/device/lib/dif:base",
         "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/testing:api_testutils",
         "//sw/device/lib/testing/test_framework:check",
     ],
 )
@@ -81,6 +82,7 @@ cc_library(
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:math",
         "//sw/device/lib/dif:aon_timer",
+        "//sw/device/lib/testing:api_testutils",
         "//sw/device/lib/testing/test_framework:check",
     ],
 )

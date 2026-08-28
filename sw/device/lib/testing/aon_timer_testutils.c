@@ -1,4 +1,5 @@
 // Copyright lowRISC contributors (OpenTitan project).
+// Copyright zeroRISC Inc.
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,48 +11,36 @@
 #include "hw/top/dt/aon_timer.h"  // Generated
 #include "hw/top/dt/api.h"        // Generated
 #include "sw/device/lib/arch/device.h"
-#include "sw/device/lib/base/math.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_aon_timer.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 
 #define MODULE_ID MAKE_MODULE_ID('a', 'o', 't')
 
 status_t aon_timer_testutils_get_aon_cycles_32_from_us(uint64_t microseconds,
                                                        uint32_t *cycles) {
-  uint64_t cycles_ =
-      udiv64_slow(microseconds * dt_clock_frequency(dt_aon_timer_clock(
-                                     kDtAonTimerAon, kDtAonTimerClockAon)),
-                  1000000,
-                  /*rem_out=*/NULL);
-  TRY_CHECK(cycles_ <= UINT32_MAX,
-            "The value 0x%08x%08x can't fit into the 32 bits timer counter.",
-            (uint32_t)(cycles_ >> 32), (uint32_t)cycles_);
-  *cycles = (uint32_t)cycles_;
-  return OK_STATUS();
+  dt_clock_t dt_clock = dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  return api_testutils_get_cycles_32_from_us(dt_clock, microseconds, cycles);
 }
 
 status_t aon_timer_testutils_get_aon_cycles_64_from_us(uint64_t microseconds,
                                                        uint64_t *cycles) {
-  *cycles =
-      udiv64_slow(microseconds * dt_clock_frequency(dt_aon_timer_clock(
-                                     kDtAonTimerAon, kDtAonTimerClockAon)),
-                  1000000,
-                  /*rem_out=*/NULL);
-  return OK_STATUS();
+  dt_clock_t dt_clock = dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  return api_testutils_get_cycles_64_from_us(dt_clock, microseconds, cycles);
 }
 
 status_t aon_timer_testutils_get_us_from_aon_cycles(uint64_t cycles,
                                                     uint32_t *us) {
-  uint64_t uss = udiv64_slow(cycles * 1000000,
-                             dt_clock_frequency(dt_aon_timer_clock(
-                                 kDtAonTimerAon, kDtAonTimerClockAon)),
-                             /*rem_out=*/NULL);
-  TRY_CHECK(uss <= UINT32_MAX,
-            "The value 0x%08x%08x can't fit into the 32 bits timer counter.",
-            (uint32_t)(uss >> 32), (uint32_t)uss);
-  *us = (uint32_t)uss;
-  return OK_STATUS();
+  dt_clock_t dt_clock = dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  return api_testutils_get_us_from_cycles(dt_clock, cycles, us);
+}
+
+status_t aon_timer_testutils_aon_cycles_spanning_micros(
+    uint32_t cycles, uint64_t micros, uint32_t *spanning_cycles) {
+  dt_clock_t dt_clock = dt_aon_timer_clock(kDtAonTimerAon, kDtAonTimerClockAon);
+  return api_testutils_cycles_spanning_micros(dt_clock, cycles, micros,
+                                              spanning_cycles);
 }
 
 status_t aon_timer_testutils_wakeup_config(const dif_aon_timer_t *aon_timer,

@@ -81,15 +81,26 @@ status_t alert_handler_testutils_configure_all(
     dif_toggle_t locked);
 
 /**
- * Returns the number of cycles corresponding to the given microseconds.
+ * Compute the alert handler cycles spanning the given microseconds.
  *
  * @param microseconds The number of microseconds.
- * @param[out] cycles The number of AON clock cycles.
+ * @param[out] cycles The number of alert handler clock cycles.
  * @return The result of the operation.
  */
 OT_WARN_UNUSED_RESULT
 status_t alert_handler_testutils_get_cycles_from_us(uint64_t microseconds,
                                                     uint32_t *cycles);
+
+/**
+ * Compute the microseconds spanning the given alert handler cycles.
+ *
+ * @param cycles The number of alert handler clock cycles.
+ * @param[out] microseconds The number of microseconds.
+ * @return The result of the operation.
+ */
+OT_WARN_UNUSED_RESULT
+status_t alert_handler_testutils_get_us_from_cycles(uint64_t cycles,
+                                                    uint32_t *microseconds);
 
 /**
  * Returns a scaling factor for conversion of time to cycles.

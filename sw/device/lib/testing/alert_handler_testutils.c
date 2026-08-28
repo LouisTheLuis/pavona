@@ -6,10 +6,10 @@
 
 #include "hw/top/dt/alert_handler.h"  // Generated
 #include "hw/top/dt/api.h"            // Generated
-#include "sw/device/lib/base/math.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_base.h"
 #include "sw/device/lib/dif/dif_rstmgr.h"
+#include "sw/device/lib/testing/api_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 
 #include "hw/top/alert_handler_regs.h"  // Generated
@@ -158,16 +158,16 @@ status_t alert_handler_testutils_configure_all(
 
 status_t alert_handler_testutils_get_cycles_from_us(uint64_t microseconds,
                                                     uint32_t *cycles) {
-  uint64_t cycles_ = udiv64_slow(
-      microseconds * dt_clock_frequency(dt_alert_handler_clock(
-                         (dt_alert_handler_t)0, kDtAlertHandlerClockClk)),
-      1000000,
-      /*rem_out=*/NULL);
-  TRY_CHECK(cycles_ < UINT32_MAX,
-            "The value 0x%08x%08x can't fit into the 32 bits timer counter.",
-            (uint32_t)(cycles_ >> 32), (uint32_t)cycles_);
-  *cycles = (uint32_t)cycles_;
-  return OK_STATUS();
+  dt_clock_t dt_clock =
+      dt_alert_handler_clock((dt_alert_handler_t)0, kDtAlertHandlerClockClk);
+  return api_testutils_get_cycles_32_from_us(dt_clock, microseconds, cycles);
+}
+
+status_t alert_handler_testutils_get_us_from_cycles(uint64_t cycles,
+                                                    uint32_t *microseconds) {
+  dt_clock_t dt_clock =
+      dt_alert_handler_clock((dt_alert_handler_t)0, kDtAlertHandlerClockClk);
+  return api_testutils_get_us_from_cycles(dt_clock, cycles, microseconds);
 }
 
 uint32_t alert_handler_testutils_cycle_rescaling_factor(void) {

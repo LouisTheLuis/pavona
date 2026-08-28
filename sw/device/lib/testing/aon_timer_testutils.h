@@ -1,4 +1,5 @@
 // Copyright lowRISC contributors (OpenTitan project).
+// Copyright zeroRISC Inc.
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,9 +12,8 @@
 #include "sw/device/lib/dif/dif_aon_timer.h"
 
 /**
- * Compute the number of AON cycles corresponding to the given microseconds.
+ * Compute the AON clock cycles spanning the given microseconds.
  *
- * @param aon_timer An Always-On Timer handle.
  * @param microseconds The number of microseconds.
  * @param[out] cycles The number of AON clock cycles as a uint32_t
  * @return The result of the operation.
@@ -23,9 +23,8 @@ status_t aon_timer_testutils_get_aon_cycles_32_from_us(uint64_t microseconds,
                                                        uint32_t *cycles);
 
 /**
- * Compute the number of AON cycles corresponding to the given microseconds.
+ * Compute the number of AON cycles spanning the given microseconds.
  *
- * @param aon_timer An Always-On Timer handle.
  * @param microseconds The number of microseconds.
  * @param[out] cycles The number of AON clock cycles as a uint64_t
  * @return The result of the operation.
@@ -35,9 +34,8 @@ status_t aon_timer_testutils_get_aon_cycles_64_from_us(uint64_t microseconds,
                                                        uint64_t *cycles);
 
 /**
- * Compute the number of microseconds corresponding to the given AON cycles.
+ * Compute the number of microseconds spanning the given AON cycles.
  *
- * @param aon_timer An Always-On Timer handle.
  * @param cycles The number of AON clock cycles.
  * @param[out] microseconds The number of microseconds.
  * @return The result of the operation.
@@ -45,6 +43,21 @@ status_t aon_timer_testutils_get_aon_cycles_64_from_us(uint64_t microseconds,
 OT_WARN_UNUSED_RESULT
 status_t aon_timer_testutils_get_us_from_aon_cycles(uint64_t cycles,
                                                     uint32_t *microseconds);
+
+/**
+ * Compute the number of AON cycles that span at least the given microseconds.
+ *
+ * The computed cycles must be greater or equal to the proposed cycles.
+ *
+ * @param cycles The proposed number of AON clock cycles.
+ * @param microseconds The number of microseconds that must be spanned.
+ * @param[out] spanning_cycles The possibly higher cycle count that spans
+ *             the required microseconds.
+ * @return The result of the operation.
+ */
+OT_WARN_UNUSED_RESULT
+status_t aon_timer_testutils_aon_cycles_spanning_micros(
+    uint32_t cycles, uint64_t microseconds, uint32_t *spanning_cycles);
 
 /**
  * Configure wakeup counter for a number of AON clock cycles.
