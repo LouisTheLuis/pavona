@@ -1816,9 +1816,10 @@ endgenerate
       assign ispr_rdata_no_intg_mux_in[IsprKmacStatus] =
           {224'b0, gen_pqc_wsr.kmac_status_intg_q[31:0]};
 
-      assign ispr_rdata_no_intg_mux_in[IsprKmacDigest0] = 0;
-      assign ispr_rdata_no_intg_mux_in[IsprKmacDigest1] = 0;
-      assign ispr_rdata_no_intg_mux_in[IsprAccH]        = 0;
+      assign ispr_rdata_no_intg_mux_in[IsprKmacPartialW] = 0;
+      assign ispr_rdata_no_intg_mux_in[IsprKmacDigest0]  = 0;
+      assign ispr_rdata_no_intg_mux_in[IsprKmacDigest1]  = 0;
+      assign ispr_rdata_no_intg_mux_in[IsprAccH]         = 0;
     end
   endgenerate
 
