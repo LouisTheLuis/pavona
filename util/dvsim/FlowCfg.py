@@ -678,19 +678,28 @@ class FlowCfg():
         log.info("Dashboard branch %r found on %s.", self.branch, repository)
 
     def _setup_ssh_env(self) -> dict:
-        """Return an env dict with SSH configured, using passphrase or deploy key."""
+        """Return an env dict with SSH configured, using passphrase or deploy key.
+
+        GIT_SSH_COMMAND is never overwritten when the caller already set one. A
+        caller that keeps a key per repository selects between them with an ssh
+        configuration file passed that way, and replacing it with a bare "ssh"
+        leaves ssh to guess the identity, which authenticates as whoever owns
+        the first key it happens to offer.
+        """
         # If an SSH agent is already running with keys loaded (e.g. CI or a developer
         # with their own agent), use it directly.
         if os.environ.get("SSH_AUTH_SOCK"):
             env = os.environ.copy()
-            env["GIT_SSH_COMMAND"] = "ssh"
+            env.setdefault("GIT_SSH_COMMAND", "ssh")
             log.info("Using pre-existing SSH agent at %s", env["SSH_AUTH_SOCK"])
             return env
 
-        # Otherwise, assume a passphrase
+        # Otherwise a passphrase, or a key that needs none.
         passphrase = os.environ.get("SSH_KEY_PASSPHRASE")
         if not passphrase:
             log.info("SSH_KEY_PASSPHRASE not set, assuming deploy key is available.")
+            env = os.environ.copy()
+            env.setdefault("GIT_SSH_COMMAND", "ssh")
             return env
         with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
             f.write(f'#!/bin/sh\necho "{passphrase}"\n')
@@ -700,7 +709,7 @@ class FlowCfg():
         env["SSH_ASKPASS"] = askpass_script
         env["SSH_ASKPASS_REQUIRE"] = "force"
         env["DISPLAY"] = ""
-        env["GIT_SSH_COMMAND"] = "ssh"
+        env.setdefault("GIT_SSH_COMMAND", "ssh")
 
         try:
             agent = subprocess.run(["ssh-agent", "-s"], check=True, capture_output=True, text=True)
