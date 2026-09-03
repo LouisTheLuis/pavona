@@ -279,10 +279,16 @@ def check_ssh_git_access(repository: str, flag: str):
     through a deploy key or through an environment variable.
     '''
     has_passphrase = bool(os.environ.get("SSH_KEY_PASSPHRASE"))
+    # BatchMode is added to whatever ssh command the caller already asked for
+    # rather than replacing it. A caller holding one deploy key per repository
+    # selects between them with an ssh configuration file passed this way, and
+    # the URLs it uses name aliases from that file, which a bare ssh cannot
+    # resolve at all.
+    ssh_command = os.environ.get("GIT_SSH_COMMAND") or "ssh"
     has_deploy_key = subprocess.run(
         ["git", "ls-remote", repository],
         capture_output=True,
-        env={**os.environ, "GIT_SSH_COMMAND": "ssh -o BatchMode=yes"}
+        env={**os.environ, "GIT_SSH_COMMAND": f"{ssh_command} -o BatchMode=yes"}
     ).returncode == 0
 
     if not has_passphrase and not has_deploy_key:
