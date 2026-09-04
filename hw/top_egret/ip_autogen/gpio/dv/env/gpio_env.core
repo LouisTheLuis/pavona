@@ -54,9 +54,13 @@ filesets:
       - seq_lib/gpio_rst_safe_smoke_with_rand_reset_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_random_dout_din_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_dout_din_regs_random_rw_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_intr_rand_pgm_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_rand_intr_trigger_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_random_long_reg_writes_reg_reads_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_full_random_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_rand_straps_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_intr_with_filter_rand_intr_event_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_filter_stress_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_common_vseq.sv: {is_include_file: true}
     file_type: systemVerilogSource
 
