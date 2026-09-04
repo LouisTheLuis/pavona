@@ -63,6 +63,8 @@ filesets:
       - seq_lib/gpio_rst_safe_intr_with_filter_rand_intr_event_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_filter_stress_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_common_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_stress_all_vseq.sv: {is_include_file: true}
+      - seq_lib/gpio_rst_safe_stress_all_with_rand_reset_vseq.sv: {is_include_file: true}
       - seq_lib/gpio_rst_safe_inp_prd_cnt_vseq.sv: {is_include_file: true}
     file_type: systemVerilogSource
 

@@ -33,6 +33,8 @@
 `include "${module_instance_name}_rst_safe_intr_with_filter_rand_intr_event_vseq.sv"
 `include "${module_instance_name}_rst_safe_filter_stress_vseq.sv"
 `include "${module_instance_name}_rst_safe_common_vseq.sv"
+`include "${module_instance_name}_rst_safe_stress_all_vseq.sv"
+`include "${module_instance_name}_rst_safe_stress_all_with_rand_reset_vseq.sv"
 % if num_inp_period_counters > 0:
 `include "${module_instance_name}_rst_safe_inp_prd_cnt_vseq.sv"
 % endif

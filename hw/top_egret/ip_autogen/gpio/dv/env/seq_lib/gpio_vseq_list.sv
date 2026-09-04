@@ -30,3 +30,5 @@
 `include "gpio_rst_safe_intr_with_filter_rand_intr_event_vseq.sv"
 `include "gpio_rst_safe_filter_stress_vseq.sv"
 `include "gpio_rst_safe_common_vseq.sv"
+`include "gpio_rst_safe_stress_all_vseq.sv"
+`include "gpio_rst_safe_stress_all_with_rand_reset_vseq.sv"

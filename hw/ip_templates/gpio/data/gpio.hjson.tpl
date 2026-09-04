@@ -124,6 +124,26 @@
       name: "GPIO.OUT.MASK"
       desc: 'Masked output access enables to modify either upper or lower 16bits of output register  without a Read-Modify-Write.'
     }
+    {
+      name: "GPIO.STRAPS"
+      desc: '''The GPIO module can take a snapshot of its filtered input and hold it as hardware
+      configuration straps. The snapshot is taken on the first assertion of `strap_en_i` after a
+      reset and is held until the next reset, so later assertions and later input activity do not
+      change it. The sampled value is readable through `HW_STRAPS_DATA_IN` and
+      `HW_STRAPS_DATA_IN_VALID` and is broadcast on `sampled_straps_o`.
+      '''
+    }
+% if num_inp_period_counters > 0:
+    {
+      name: "GPIO.IN.PERIOD_COUNTER"
+      desc: '''The GPIO module provides ${num_inp_period_counters} input period counters, each
+      measuring the number of cycles between two relevant edges of a selected filtered input. A
+      counter has a prescaler, a polarity selecting which edge opens and closes the measurement,
+      and a continuous mode. In non-continuous mode the counter clears its own enable bit once a
+      measurement completes.
+      '''
+    }
+% endif
   ]
   inter_signal_list: [
     { struct:  "logic",

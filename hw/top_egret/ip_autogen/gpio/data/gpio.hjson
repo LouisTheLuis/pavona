@@ -118,6 +118,15 @@
       name: "GPIO.OUT.MASK"
       desc: 'Masked output access enables to modify either upper or lower 16bits of output register  without a Read-Modify-Write.'
     }
+    {
+      name: "GPIO.STRAPS"
+      desc: '''The GPIO module can take a snapshot of its filtered input and hold it as hardware
+      configuration straps. The snapshot is taken on the first assertion of `strap_en_i` after a
+      reset and is held until the next reset, so later assertions and later input activity do not
+      change it. The sampled value is readable through `HW_STRAPS_DATA_IN` and
+      `HW_STRAPS_DATA_IN_VALID` and is broadcast on `sampled_straps_o`.
+      '''
+    }
   ]
   inter_signal_list: [
     { struct:  "logic",

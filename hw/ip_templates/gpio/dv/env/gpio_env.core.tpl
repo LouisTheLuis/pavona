@@ -65,6 +65,8 @@ filesets:
       - seq_lib/${module_instance_name}_rst_safe_intr_with_filter_rand_intr_event_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_rst_safe_filter_stress_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_rst_safe_common_vseq.sv: {is_include_file: true}
+      - seq_lib/${module_instance_name}_rst_safe_stress_all_vseq.sv: {is_include_file: true}
+      - seq_lib/${module_instance_name}_rst_safe_stress_all_with_rand_reset_vseq.sv: {is_include_file: true}
 % if num_inp_period_counters > 0:
       - seq_lib/${module_instance_name}_rst_safe_inp_prd_cnt_vseq.sv: {is_include_file: true}
 % endif

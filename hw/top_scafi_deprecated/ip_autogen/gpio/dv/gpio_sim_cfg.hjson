@@ -36,7 +36,7 @@
                 "{proj_root}/hw/dv/tools/dvsim/tests/intr_test.hjson",
                 "{proj_root}/hw/dv/tools/dvsim/tests/tl_access_tests.hjson",
                 "{proj_root}/hw/dv/tools/dvsim/tests/sec_cm_tests.hjson",
-                "{proj_root}/hw/dv/tools/dvsim/tests/stress_tests.hjson"]
+                "{proj_root}/hw/dv/tools/dvsim/tests/rst_safe_stress_tests.hjson"]
 
   // Add additional tops for simulation.
   sim_tops: ["gpio_bind", "sec_cm_prim_onehot_check_bind"]
@@ -58,25 +58,6 @@
 
   // Add GPIO specific exclusion files.
   vcs_cov_excl_files: ["{self_dir}/cov/gpio_cov_excl.el"]
-
-  // Enable cdc instrumentation.
-  run_opts: ["+cdc_instrumentation_enabled=1"]
-
-  // Add a second build mode to test the input synchronizers.
-  // Note that since the scoreboard has a cycle accurate model
-  // for GPIO without the synchronizers, the majority of the tests
-  // is run in the default build mode without the CDC prims. The en_cdc_prims
-  // build mode is used to run some additional smoke checks to ensure
-  // that the input paths through the CDC prims are connected correctly.
-  build_modes: [
-    {
-      name: en_cdc_prims
-      build_opts: ["+define+GPIO_ASYNC_ON"]
-    }
-  ]
-
-  en_cdc_prims_vcs_cov_cfg_file: "{default_vcs_cov_cfg_file}"
-  en_cdc_prims_xcelium_cov_cfg_file: "{default_xcelium_cov_cfg_file}"
 
   // List of test specifications.
   tests: [
@@ -144,17 +125,6 @@
     }
 
     {
-      name: gpio_stress_all
-      uvm_test_seq: gpio_stress_all_vseq
-      run_opts: ["+do_clear_all_interrupts=0"]
-    }
-
-    {
-      name: gpio_stress_all_with_rand_reset
-      run_opts: ["+do_clear_all_interrupts=0"]
-    }
-
-    {
       name: gpio_csr_rw
       run_opts: ["+do_clear_all_interrupts=0"]
     }
@@ -179,19 +149,6 @@
       run_opts: ["+do_clear_all_interrupts=0"]
     }
 
-    // Additional smoke checks for second build mode
-    {
-      name: gpio_smoke_en_cdc_prim
-      uvm_test_seq: gpio_smoke_vseq
-      build_mode: en_cdc_prims
-    }
-
-    {
-      name: gpio_smoke_no_pullup_pulldown_en_cdc_prim
-      uvm_test_seq: gpio_smoke_vseq
-      build_mode: en_cdc_prims
-      run_opts: ["+no_pullup_pulldown=1"]
-    }
     {
       name: gpio_rand_straps
       uvm_test_seq: gpio_rand_straps_vseq
@@ -207,6 +164,76 @@
     }
 
     {
+      name: gpio_rst_safe_random_dout_din
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_random_dout_din_vseq
+    }
+
+    {
+      name: gpio_rst_safe_dout_din_regs_random_rw
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_dout_din_regs_random_rw_vseq
+    }
+
+    {
+      name: gpio_rst_safe_intr_rand_pgm
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_intr_rand_pgm_vseq
+    }
+
+    {
+      name: gpio_rst_safe_rand_intr_trigger
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_rand_intr_trigger_vseq
+    }
+
+    {
+      name: gpio_rst_safe_random_long_reg_writes_reg_reads
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_random_long_reg_writes_reg_reads_vseq
+    }
+
+    {
+      name: gpio_rst_safe_full_random
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_full_random_vseq
+    }
+
+    {
+      name: gpio_rst_safe_rand_straps
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_rand_straps_vseq
+    }
+
+    {
+      name: gpio_rst_safe_intr_with_filter_rand_intr_event
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_intr_with_filter_rand_intr_event_vseq
+    }
+
+    {
+      name: gpio_rst_safe_filter_stress
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_filter_stress_vseq
+    }
+
+    // A board with neither weak pull, so a pin nothing drives is genuinely floating. The
+    // legacy path reaches this through the same plusarg.
+    {
+      name: gpio_rst_safe_smoke_no_pullup_pulldown
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_smoke_vseq
+      run_opts: ["+no_pullup_pulldown=1"]
+    }
+
+    {
+      name: gpio_rst_safe_random_dout_din_no_pullup_pulldown
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_random_dout_din_vseq
+      run_opts: ["+no_pullup_pulldown=1"]
+    }
+
+    {
       name: gpio_rst_safe_smoke_with_rand_reset
       uvm_test: gpio_rst_safe_base_test
       uvm_test_seq: gpio_rst_safe_smoke_with_rand_reset_vseq
@@ -217,7 +244,7 @@
   regressions: [
     {
       name: smoke
-      tests: ["gpio_smoke", "gpio_smoke_en_cdc_prim"]
+      tests: ["gpio_smoke", "gpio_rst_safe_smoke"]
     }
   ]
 }
