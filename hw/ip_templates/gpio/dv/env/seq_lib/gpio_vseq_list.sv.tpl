@@ -23,5 +23,11 @@
 `include "${module_instance_name}_rand_rst_safe_base_vseq.sv"
 `include "${module_instance_name}_rst_safe_smoke_vseq.sv"
 `include "${module_instance_name}_rst_safe_smoke_with_rand_reset_vseq.sv"
+`include "${module_instance_name}_rst_safe_random_dout_din_vseq.sv"
+`include "${module_instance_name}_rst_safe_dout_din_regs_random_rw_vseq.sv"
+`include "${module_instance_name}_rst_safe_random_long_reg_writes_reg_reads_vseq.sv"
+`include "${module_instance_name}_rst_safe_full_random_vseq.sv"
+`include "${module_instance_name}_rst_safe_rand_straps_vseq.sv"
+`include "${module_instance_name}_rst_safe_common_vseq.sv"
 % if num_inp_period_counters > 0:
 % endif
