@@ -18,3 +18,6 @@
 `include "gpio_rand_straps_vseq.sv"
 
 // Reset-safe sequences. The legacy list above stays intact while this path is developed.
+`include "gpio_rand_rst_safe_base_vseq.sv"
+`include "gpio_rst_safe_smoke_vseq.sv"
+`include "gpio_rst_safe_smoke_with_rand_reset_vseq.sv"

@@ -20,5 +20,8 @@
 `include "${module_instance_name}_rand_straps_vseq.sv"
 
 // Reset-safe sequences. The legacy list above stays intact while this path is developed.
+`include "${module_instance_name}_rand_rst_safe_base_vseq.sv"
+`include "${module_instance_name}_rst_safe_smoke_vseq.sv"
+`include "${module_instance_name}_rst_safe_smoke_with_rand_reset_vseq.sv"
 % if num_inp_period_counters > 0:
 % endif

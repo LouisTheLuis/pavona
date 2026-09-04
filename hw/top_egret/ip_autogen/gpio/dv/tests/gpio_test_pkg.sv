@@ -17,4 +17,5 @@ package gpio_test_pkg;
 
   // package sources
   `include "gpio_base_test.sv"
+  `include "gpio_rst_safe_base_test.sv"
 endpackage

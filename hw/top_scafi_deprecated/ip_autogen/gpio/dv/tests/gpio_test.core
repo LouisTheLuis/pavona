@@ -11,6 +11,7 @@ filesets:
     files:
       - gpio_test_pkg.sv
       - gpio_base_test.sv: {is_include_file: true}
+      - gpio_rst_safe_base_test.sv: {is_include_file: true}
     file_type: systemVerilogSource
 
 targets:

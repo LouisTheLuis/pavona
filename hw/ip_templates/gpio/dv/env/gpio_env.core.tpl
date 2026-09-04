@@ -52,6 +52,9 @@ filesets:
       - seq_lib/${module_instance_name}_intr_rand_pgm_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_intr_with_filter_rand_intr_event_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_rand_straps_vseq.sv : {is_include_file: true}
+      - seq_lib/${module_instance_name}_rand_rst_safe_base_vseq.sv: {is_include_file: true}
+      - seq_lib/${module_instance_name}_rst_safe_smoke_vseq.sv: {is_include_file: true}
+      - seq_lib/${module_instance_name}_rst_safe_smoke_with_rand_reset_vseq.sv: {is_include_file: true}
 % if num_inp_period_counters > 0:
 % endif
     file_type: systemVerilogSource

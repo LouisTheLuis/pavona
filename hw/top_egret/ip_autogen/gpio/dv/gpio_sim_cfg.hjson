@@ -196,6 +196,21 @@
       name: gpio_rand_straps
       uvm_test_seq: gpio_rand_straps_vseq
     }
+
+    // Reset-safe path. These run on their own base test and environment; the legacy entries
+    // above are untouched and keep their testplan mappings until a reset-safe sequence has
+    // been shown to be functionally equivalent.
+    {
+      name: gpio_rst_safe_smoke
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_smoke_vseq
+    }
+
+    {
+      name: gpio_rst_safe_smoke_with_rand_reset
+      uvm_test: gpio_rst_safe_base_test
+      uvm_test_seq: gpio_rst_safe_smoke_with_rand_reset_vseq
+    }
   ]
 
   // List of regressions.
