@@ -15,6 +15,20 @@ module tb;
   `include "uvm_macros.svh"
   `include "dv_macros.svh"
 
+  // Elaboration choices are declared once here, then used both to elaborate the DUT and to
+  // publish the build configuration to the environment. A single declaration is what stops
+  // the testbench model and the device under test disagreeing about how this build was
+  // elaborated.
+  //
+  // We have two build modes in this testbench: one with CDC synchronizers enabled, and one
+  // where they are disabled.
+`ifdef GPIO_ASYNC_ON
+  localparam bit GpioAsyncOn = 1'b1;
+`else
+  localparam bit GpioAsyncOn = 1'b0;
+`endif
+  localparam bit GpioAsHwStrapsEn = 1'b1;
+
   wire clk, rst_n;
   wire [NUM_GPIOS-1:0] gpio_pins;
   wire [NUM_GPIOS-1:0] gpio_i;
@@ -45,13 +59,8 @@ module tb;
 
   // dut
   ${module_instance_name} #(
-    // We have two build modes in this testbench: one with CDC synchronizers enabled, and one
-    // where they are disabled.
-`ifdef GPIO_ASYNC_ON
-    .GpioAsyncOn(1)
-`else
-    .GpioAsyncOn(0)
-`endif
+    .GpioAsyncOn(GpioAsyncOn),
+    .GpioAsHwStrapsEn(GpioAsHwStrapsEn)
   ) dut (
     .clk_i (clk),
     .rst_ni(rst_n),
@@ -78,6 +87,10 @@ module tb;
 
   assign interrupts[NUM_GPIOS-1:0] = gpio_intr;
 
+  // Passive observation of the device's hardware register commits, using upward name
+  // references from inside the device.
+  bind dut ${module_instance_name}_probe_if u_${module_instance_name}_probe_if ();
+
   // gpio pins are represented by bi-directional gpio_if interface
   // drive the pins only if en_o bit from the dut is high
   assign gpio_i = gpio_pins[NUM_GPIOS-1:0];
@@ -93,6 +106,12 @@ module tb;
     uvm_config_db#(virtual tl_if)::set(null, "*.env.m_tl_agent*", "vif", tl_if);
     uvm_config_db#(virtual pins_if #(NUM_GPIOS))::set(null, "*.env", "gpio_vif", gpio_if);
     uvm_config_db#(virtual ${module_instance_name}_straps_if)::set(null, "*.*", "straps_vif", straps_if_inst);
+    // Published from the localparams above so the environment reads the elaboration of this
+    // build rather than assuming one. Retrieved by ${module_instance_name}_env_cfg::initialize().
+    uvm_config_db#(bit)::set(null, "*", "gpio_async_on", GpioAsyncOn);
+    uvm_config_db#(bit)::set(null, "*", "gpio_as_hw_straps_en", GpioAsHwStrapsEn);
+    uvm_config_db#(virtual ${module_instance_name}_probe_if)::set(
+        null, "*.env", "probe_vif", dut.u_${module_instance_name}_probe_if);
     $timeformat(-12, 0, " ps", 12);
     run_test();
   end

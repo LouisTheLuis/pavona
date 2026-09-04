@@ -15,6 +15,7 @@ filesets:
       - ${instance_vlnv(f"lowrisc:dv:{module_instance_name}_sva")}
       - ${instance_vlnv(f"lowrisc:dv:{module_instance_name}_if")}
     files:
+      - tb/${module_instance_name}_probe_if.sv
       - tb/tb.sv
     file_type: systemVerilogSource
 

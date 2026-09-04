@@ -9,11 +9,31 @@ filesets:
     depend:
       - lowrisc:dv:ralgen
       - lowrisc:dv:cip_lib
+      - lowrisc:dv:clk_rst_agent
+      # ${module_instance_name}_reg_pkg supplies NumIOs and NumInpPeriodCounters to the
+      # environment package.
+      - ${instance_vlnv(f"lowrisc:ip:{module_instance_name}:0.1")}
     files:
       - ${module_instance_name}_env_pkg.sv
       - ${module_instance_name}_env_cfg.sv: {is_include_file: true}
       - ${module_instance_name}_env_cov.sv: {is_include_file: true}
+      - ${module_instance_name}_seq_item.sv: {is_include_file: true}
+      - ${module_instance_name}_straps_item.sv: {is_include_file: true}
+      - ${module_instance_name}_intr_item.sv: {is_include_file: true}
+      - ${module_instance_name}_input_item.sv: {is_include_file: true}
+      - ${module_instance_name}_hw_write_item.sv: {is_include_file: true}
+      - ${module_instance_name}_output_item.sv: {is_include_file: true}
+      - ${module_instance_name}_agent_cfg.sv: {is_include_file: true}
+      - ${module_instance_name}_sequencer.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_driver.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_monitor.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_agent.sv: {is_include_file: true}
+      - ${module_instance_name}_reference_model.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_env_cov.sv: {is_include_file: true}
       - ${module_instance_name}_scoreboard.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_scoreboard.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_virtual_sequencer.sv: {is_include_file: true}
+      - ${module_instance_name}_rst_safe_env.sv: {is_include_file: true}
       - ${module_instance_name}_env.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_vseq_list.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_base_vseq.sv: {is_include_file: true}
@@ -32,6 +52,8 @@ filesets:
       - seq_lib/${module_instance_name}_intr_rand_pgm_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_intr_with_filter_rand_intr_event_vseq.sv: {is_include_file: true}
       - seq_lib/${module_instance_name}_rand_straps_vseq.sv : {is_include_file: true}
+% if num_inp_period_counters > 0:
+% endif
     file_type: systemVerilogSource
 
 generate:

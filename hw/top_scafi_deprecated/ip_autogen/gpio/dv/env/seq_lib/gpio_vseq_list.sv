@@ -15,3 +15,5 @@
 `include "gpio_full_random_vseq.sv"
 `include "gpio_stress_all_vseq.sv"
 `include "gpio_rand_straps_vseq.sv"
+
+// Reset-safe sequences. The legacy list above stays intact while this path is developed.

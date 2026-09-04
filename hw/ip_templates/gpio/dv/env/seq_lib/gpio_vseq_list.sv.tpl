@@ -18,3 +18,7 @@
 `include "${module_instance_name}_full_random_vseq.sv"
 `include "${module_instance_name}_stress_all_vseq.sv"
 `include "${module_instance_name}_rand_straps_vseq.sv"
+
+// Reset-safe sequences. The legacy list above stays intact while this path is developed.
+% if num_inp_period_counters > 0:
+% endif

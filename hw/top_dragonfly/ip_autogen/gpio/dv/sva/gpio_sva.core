@@ -9,7 +9,12 @@ filesets:
     depend:
       - lowrisc:tlul:headers
       - lowrisc:fpv:csr_assert_gen
+      - lowrisc:prim:assert
+      - lowrisc:dragonfly_ip:gpio:0.1
     files:
+      - gpio_intr_assert.sv
+      - gpio_filter_assert.sv
+      - gpio_cnt_assert.sv
       - gpio_bind.sv
     file_type: systemVerilogSource
 

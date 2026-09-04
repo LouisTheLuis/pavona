@@ -9,7 +9,12 @@ filesets:
     depend:
       - lowrisc:tlul:headers
       - lowrisc:fpv:csr_assert_gen
+      - lowrisc:prim:assert
+      - ${instance_vlnv(f"lowrisc:ip:{module_instance_name}:0.1")}
     files:
+      - ${module_instance_name}_intr_assert.sv
+      - ${module_instance_name}_filter_assert.sv
+      - ${module_instance_name}_cnt_assert.sv
       - ${module_instance_name}_bind.sv
     file_type: systemVerilogSource
 

@@ -15,6 +15,7 @@ filesets:
       - lowrisc:scafi_deprecated_dv:gpio_sva
       - lowrisc:scafi_deprecated_dv:gpio_if
     files:
+      - tb/gpio_probe_if.sv
       - tb/tb.sv
     file_type: systemVerilogSource
 
