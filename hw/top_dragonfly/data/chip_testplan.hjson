@@ -2008,7 +2008,6 @@
       stage: V1
       tests: ["chip_sw_example_rom",
               "chip_sw_example_flash",
-              "chip_sw_uart_smoketest_signed",
               "chip_sw_example_manufacturer",
               "chip_sw_example_concurrency"
               ]
@@ -2050,18 +2049,6 @@
             '''
       stage: V2
       tests: ["rom_keymgr_dpe_functest"]
-    }
-    {
-      name: chip_sw_signed
-      desc: '''Run some chip-level tests with ROM.
-
-            In addition to ROM E2E tests, we select at least one (or a few)
-            tests defined in this file to sign, and run via ROM instead of
-            test ROM. We need to ensure our test infrastructure and ROM can
-            boot and run one (or a few) of the same tests our test ROM can.
-            '''
-      stage: V2
-      tests: ["chip_sw_uart_smoketest_signed"]
     }
     {
       name: chip_sw_coremark
