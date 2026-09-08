@@ -289,7 +289,15 @@ class ACCSim:
         In this state, we're waiting for a URND seed. Once that appears, we
         switch to EXEC.
         '''
-        if self.state.wsrs.URND.running:
+        # An RMA request takes priority over the transition to EXEC.
+        #
+        # The lock below is only "immediate" while we are still in PRE_EXEC. Moving to EXEC first
+        # leaves the lock to be followed by the ordinary EXEC -> PRE_WIPE -> WIPING route, which
+        # rewrites STATUS back to BUSY_SEC_WIPE_INT a few cycles after it was set to LOCKED. The
+        # RTL does not do that: from AccStartStopStateUrndRefresh an RMA request goes straight to
+        # AccStartStopStateLocked and stays there.
+        rma_now = self.state.rma_req == LcTx.ON
+        if self.state.wsrs.URND.running and not rma_now:
             self.state.set_fsm_state(FsmState.EXEC)
 
         changes = self._on_stall(verbose, fetch_next=False)
@@ -315,14 +323,6 @@ class ACCSim:
         self.state.wsrs.KMAC_MSG0.step(False)
         self.state.wsrs.KMAC_MSG1.step(True)
 
-        insn = self._next_insn
-        if insn is None:
-            self.state.take_injected_err_bits()
-            # Don't count the stall for the stats here because fetch stalls are
-            # caused by the previous instruction. It has already been counted
-            # in `_on_retire`.
-            return (None, self._on_stall(verbose, fetch_next=True, no_count=True))
-
         # If there is an RMA request, we treat it a bit like a fatal error, and
         # abort any instruction that's currently running
         if self.state.rma_req == LcTx.ON:
@@ -337,6 +337,14 @@ class ACCSim:
             self.state.set_fsm_state(FsmState.PRE_WIPE)
             self.state.lock_after_wipe = True
             self._execute_generator = None
+
+        insn = self._next_insn
+        if insn is None:
+            self.state.take_injected_err_bits()
+            # Don't count the stall for the stats here because fetch stalls are
+            # caused by the previous instruction. It has already been counted
+            # in `_on_retire`.
+            return (None, self._on_stall(verbose, fetch_next=True, no_count=True))
 
         # Whether or not we're currently executing an instruction, we fetched
         # an instruction on the previous cycle. If that fetch failed then
