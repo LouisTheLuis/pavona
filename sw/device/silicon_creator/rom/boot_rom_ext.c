@@ -410,9 +410,9 @@ static rom_error_t rom_boot_rom_ext(const manifest_t *manifest,
   // Enable execution of code from flash if signature is verified.
   flash_ctrl_exec_set(flash_exec);
   SEC_MMIO_WRITE_INCREMENT(kFlashCtrlSecMmioExecSet);
+#endif
   sec_mmio_check_values(rnd_uint32());
   sec_mmio_check_counters(/*expected_check_count=*/5);
-#endif
 
   // Jump to ROM_EXT entry point.
   enum {
