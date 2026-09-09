@@ -17,6 +17,8 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
   localparam bit [31:0] RAM_STACK_GUARD_ADDRESS          = 32'h1000C000;
   localparam bit [31:0] MMIO_START_ADDRESS               = 32'h21100000;
   localparam bit [31:0] MMIO_END_ADDRESS                 = 32'h30601000;
+  localparam bit [31:0] SRAM_MBOX_START_ADDRESS          = 32'h11000000;
+  localparam bit [31:0] SRAM_MBOX_SIZE_BYTES             = 32'h00001000;
   localparam bit [31:0] CREATOR_FW_PHY_START_ADDRESS     = 32'h41000000;
   localparam bit [31:0] CREATOR_FW_SIZE_BYTES            = 32'h00080000;
   localparam bit [31:0] ROM_CTRL1_ENTRY_POINT_OFFSET     = 32'h00000180;
@@ -177,14 +179,14 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     // |   2    | Second ROM            |    NAPOT     |     R      |    X    |
     // |   3    | Creator FW Text (lo)  |     OFF*     |            |         |
     // |   4    | Creator FW Text (hi)  |     TOR      |     RX     |    X    |
-    // |   5    | Creator FW (Virtual)  |    NAPOT     |     R      |    X    |
+    // |   5    |                       |     OFF      |            |         |
     // |   6    |                       |     OFF      |            |         |
     // |   7    |                       |     OFF      |            |         |
     // |   8    |                       |     OFF      |            |         |
     // |   9    |                       |     OFF      |            |         |
     // |   10   | MMIO (lo)             |     OFF*     |            |         |
     // |   11   | MMIO (hi)             |     TOR      |     RW     |    X    |
-    // |   12   |                       |     OFF      |            |         |
+    // |   12   | Mailbox RAM           |    NAPOT     |     RW     |    X    |
     // |   13   | CTN                   |    NAPOT     |     R      |    X    |
     // |   14   | Stack Guard           |     NA4      |  NOACCESS  |    X    |
     // |   15   | Main SRAM             |    NAPOT     |     RW     |    X    |
@@ -192,8 +194,10 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     // Regions marked with a * are marked as OFF, but the address is still
     // significant because it is the lower-bound of a TOR region.
     //
-    // Note: Slots 6-7 are filled with a second ROM patch TOR region if a patch
-    // exists, but this test does not use one.
+	// Note: Slot 5 is filled with the Creator Firmware Virtual address range if
+	// the manifest requests address translation, but this is unused in the
+	// test. Slots 6-7 are filled with a second ROM patch TOR region if a patch
+	// exists, but this is also unused by the test.
 
     // Check ePMP address entries
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[0],
@@ -206,6 +210,8 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
 	// depend on the size and linkage of the test binary.
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[10], epmp_addr_tor(MMIO_START_ADDRESS))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[11], epmp_addr_tor(MMIO_END_ADDRESS))
+    `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[12], epmp_addr_napot(SRAM_MBOX_START_ADDRESS,
+                                                            SRAM_MBOX_SIZE_BYTES))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[13], epmp_addr_napot(CREATOR_FW_PHY_START_ADDRESS,
                                                             CREATOR_FW_SIZE_BYTES))
     // PMP NA4 address calculation is the same as the TOR calculation.
@@ -220,14 +226,14 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[2].mode,  ibex_pkg::PMP_MODE_NAPOT)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[3].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[4].mode, ibex_pkg::PMP_MODE_TOR)
-    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[5].mode, ibex_pkg::PMP_MODE_NAPOT)
+    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[5].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[6].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[7].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[8].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[9].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[10].mode, ibex_pkg::PMP_MODE_OFF)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[11].mode, ibex_pkg::PMP_MODE_TOR)
-    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[12].mode, ibex_pkg::PMP_MODE_OFF)
+    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[12].mode, ibex_pkg::PMP_MODE_NAPOT)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[13].mode, ibex_pkg::PMP_MODE_NAPOT)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[14].mode, ibex_pkg::PMP_MODE_NA4)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[15].mode, ibex_pkg::PMP_MODE_NAPOT)
@@ -236,9 +242,9 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[1][2:0], EPMP_ACCESS_RX)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[2][2:0], EPMP_ACCESS_RO)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[4][2:0], EPMP_ACCESS_RX)
-    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[5][2:0], EPMP_ACCESS_RO)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[11][2:0], EPMP_ACCESS_RW)
-    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[14][2:0], EPMP_ACCESS_RO)
+    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[12][2:0], EPMP_ACCESS_RW)
+    `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[13][2:0], EPMP_ACCESS_RO)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[14][2:0], EPMP_ACCESS_NONE)
     `DV_CHECK_EQ(cfg.chip_vif.pmp_cfg[15][2:0], EPMP_ACCESS_RW)
 
@@ -246,8 +252,8 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
     `DV_CHECK(cfg.chip_vif.pmp_cfg[1].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[2].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[4].lock)
-    `DV_CHECK(cfg.chip_vif.pmp_cfg[5].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[11].lock)
+    `DV_CHECK(cfg.chip_vif.pmp_cfg[12].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[13].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[14].lock)
     `DV_CHECK(cfg.chip_vif.pmp_cfg[15].lock)
