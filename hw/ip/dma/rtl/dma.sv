@@ -86,8 +86,6 @@ module dma
   // SEC_CM: FSM.SPARSE
   dma_ctrl_state_e ctrl_state_q, ctrl_state_d;
   logic abort_complete;
-  logic abort_rsp_pending, abort_rsp_complete;
-  dma_ctrl_state_e abort_wait_state;
   logic set_error_code, clear_go, clear_status, clear_sha_status, chunk_done;
 
   logic [INTR_CLEAR_SOURCES_WIDTH-1:0] clear_index_d, clear_index_q;
@@ -640,52 +638,51 @@ module dma
     // Default assignments for the muxed config signals for the idle state
     cfg_handshake_en = control_q.cfg_handshake_en;
 
-    // Derive the transport state that must survive an abort. A response-wait state means the
-    // request was accepted in an earlier cycle. A send-state grant means acceptance is happening
-    // now; retaining the matching wait state covers that same-cycle abort boundary as well.
-    abort_rsp_pending  = 1'b0;
-    abort_rsp_complete = 1'b0;
-    abort_wait_state   = ctrl_state_q;
-    unique case (ctrl_state_q)
-      DmaSendRead: begin
-        abort_rsp_pending  = read_gnt;
-        abort_rsp_complete = read_rsp_valid;
-        abort_wait_state   = DmaWaitReadResponse;
-      end
-      DmaWaitReadResponse: begin
-        abort_rsp_pending  = 1'b1;
-        abort_rsp_complete = read_rsp_valid;
-      end
-      DmaSendWrite: begin
-        abort_rsp_pending  = write_gnt;
-        abort_rsp_complete = write_rsp_valid;
-        abort_wait_state   = DmaWaitWriteResponse;
-      end
-      DmaWaitWriteResponse: begin
-        abort_rsp_pending  = 1'b1;
-        abort_rsp_complete = write_rsp_valid;
-      end
-      DmaWaitIntrSrcResponse: begin
-        abort_rsp_pending  = 1'b1;
-        abort_rsp_complete = intr_clear_tlul_rsp_valid;
-      end
-      default: ;
-    endcase
-
     if (cfg_abort_en) begin
+      // ABORT Handling
+      //
+      // Abort means stopping the current transaction and getting back to the Idle state.
+      // Abort handling is done using a separate state machine to avoid complicating the
+      // normal handling of DMA transactions.
+      //
       // Clear GO as soon as software requests abort, preventing any further functional work. If
       // the current state represents an accepted request, retain that response-wait state until
       // the response drains. CONTROL.abort remains set during this interval, preserving abort's
       // priority and preventing the normal FSM from applying response side effects.
       clear_go = 1'b1;
-      if (abort_rsp_pending && !abort_rsp_complete) begin
-        ctrl_state_d = abort_wait_state;
-      end else begin
-        // No response is owed, or it is completing with the abort request.
-        abort_complete = 1'b1;
-        ctrl_state_d   = DmaIdle;
-      end
+      // Handle concurrent grant and response, as the regular state machine does.
+      unique case (ctrl_state_q)
+        DmaSendRead,
+        DmaWaitReadResponse: begin
+          if (read_rsp_valid) begin
+            ctrl_state_d = DmaIdle;
+            abort_complete = 1'b1;
+          end else if (read_gnt) begin
+            ctrl_state_d = DmaWaitReadResponse;
+          end
+        end
+        DmaSendWrite,
+        DmaWaitWriteResponse: begin
+          if (write_rsp_valid) begin
+            ctrl_state_d = DmaIdle;
+            abort_complete = 1'b1;
+          end else if (write_gnt) begin
+            ctrl_state_d = DmaWaitWriteResponse;
+          end
+        end
+        DmaWaitIntrSrcResponse: begin
+          if (intr_clear_tlul_rsp_valid) begin
+            ctrl_state_d = DmaIdle;
+            abort_complete = 1'b1;
+          end
+        end
+        default: begin
+          ctrl_state_d = DmaIdle;
+          abort_complete = 1'b1;
+        end
+      endcase
     end else begin
+      // Normal operation with no abort.
       unique case (ctrl_state_q)
         DmaIdle: begin
           chunk_byte_d       = '0;
@@ -1301,7 +1298,7 @@ module dma
     end
 
     // Only mux the digest data when sha2_digest_set is set. Setting the digest happens during the
-    // DmaFinalze state, where we need to use the stored and locked `control_q.opcode` value.
+    // DmaShaFinalize state, where we need to use the stored and locked `control_q.opcode` value.
     // In case of clear_sha_status being asserted, the default value from hw2reg = '0; clears
     // the digest
     if (sha2_digest_set) begin
