@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-class pwrmgr_env_cfg extends cip_base_env_cfg #(
+class pwrmgr_env_cfg extends cip_rst_safe_base_env_cfg #(
   .RAL_T(pwrmgr_reg_block)
 );
 
@@ -14,6 +14,18 @@ class pwrmgr_env_cfg extends cip_base_env_cfg #(
 
   // ext component cfgs
   alert_esc_agent_cfg        m_esc_agent_cfg;
+
+  // Reset-safe agent configurations. Built by the reset-safe environment, left null by the
+  // normal one, which does not create these agents.
+  pwrmgr_aon_agent_cfg       m_aon_agent_cfg;
+  pwrmgr_fast_agent_cfg      m_fast_agent_cfg;
+
+  // The resets the device receives that it does not have applied to it. The power-on reset is
+  // the primary domain inherited from the base configuration; these three are its leaves and
+  // are held in cfg so the environment can hand each agent the one it recovers on.
+  pwrmgr_derived_rst_domain  fast_reset_domain;
+  pwrmgr_derived_rst_domain  lc_reset_domain;
+  pwrmgr_derived_rst_domain  esc_reset_domain;
 
   `uvm_object_utils_begin(pwrmgr_env_cfg)
   `uvm_object_utils_end

@@ -1,0 +1,158 @@
+// Copyright zeroRISC Inc.
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+// The reset-safe environment for the power manager.
+//
+// It owns the two block agents and settles which reset each part of the testbench recovers on.
+// The device receives four resets and only one of them is stimulus, so that assignment is the
+// substance of this class rather than a formality.
+//
+// The escalation agent is created even though no test here escalates yet. Its sender driver is
+// what holds the escalation pair at its idle encoding, so without the agent the device's
+// escalation receiver sees an undriven input and its own output goes unknown. Its reset
+// contract has not been reviewed, which matters once escalation tests are ported, but it has
+// to be present for the device to run at all.
+class pwrmgr_rst_safe_env extends cip_rst_safe_base_env #(
+    .CFG_T              (pwrmgr_env_cfg),
+    .COV_T              (pwrmgr_rst_safe_env_cov),
+    .VIRTUAL_SEQUENCER_T(pwrmgr_rst_safe_virtual_sequencer),
+    .SCOREBOARD_T       (pwrmgr_rst_safe_scoreboard)
+  );
+
+  `uvm_component_utils(pwrmgr_rst_safe_env)
+  `uvm_component_new
+
+  pwrmgr_aon_rst_safe_agent  m_aon_agent;
+  pwrmgr_fast_rst_safe_agent m_fast_agent;
+  alert_esc_agent            m_esc_agent;
+
+  extern virtual function void build_phase(uvm_phase phase);
+  extern virtual function void connect_phase(uvm_phase phase);
+
+  extern protected function void get_interfaces();
+  extern protected function void build_reset_domains();
+  extern protected function void build_block_agents();
+endclass : pwrmgr_rst_safe_env
+
+
+function void pwrmgr_rst_safe_env::build_phase(uvm_phase phase);
+  super.build_phase(phase);
+
+  get_interfaces();
+  build_reset_domains();
+  build_block_agents();
+
+  // The real slow clock is 200kHz. Running it faster costs nothing in what is being checked
+  // and saves a great deal of simulated time.
+  cfg.slow_clk_rst_vif.set_freq_mhz(7);
+  cfg.esc_clk_rst_vif.set_freq_mhz(cfg.clk_rst_vif.clk_freq_mhz);
+  cfg.lc_clk_rst_vif.set_freq_mhz(cfg.clk_rst_vif.clk_freq_mhz);
+endfunction : build_phase
+
+
+function void pwrmgr_rst_safe_env::get_interfaces();
+  if (!uvm_config_db#(virtual clk_rst_if)::get(this, "", "slow_clk_rst_vif",
+                                               cfg.slow_clk_rst_vif)) begin
+    `uvm_fatal(`gfn, "failed to get slow_clk_rst_vif from uvm_config_db")
+  end
+  if (!uvm_config_db#(virtual clk_rst_if)::get(this, "", "esc_clk_rst_vif",
+                                               cfg.esc_clk_rst_vif)) begin
+    `uvm_fatal(`gfn, "failed to get esc_clk_rst_vif from uvm_config_db")
+  end
+  if (!uvm_config_db#(virtual clk_rst_if)::get(this, "", "lc_clk_rst_vif",
+                                               cfg.lc_clk_rst_vif)) begin
+    `uvm_fatal(`gfn, "failed to get lc_clk_rst_vif from uvm_config_db")
+  end
+  if (!uvm_config_db#(virtual pwrmgr_if)::get(this, "", "pwrmgr_vif", cfg.pwrmgr_vif)) begin
+    `uvm_fatal(`gfn, "failed to get pwrmgr_vif from uvm_config_db")
+  end
+endfunction : get_interfaces
+
+
+// The power-on reset is the only reset a test applies, and it is the always-on one. The base
+// environment built the primary domain from the default register block's clock, which for this
+// device is the fast interface, so it is replaced here before anything reads it. The three
+// resets the device produces get domains that can be waited on but never applied.
+function void pwrmgr_rst_safe_env::build_reset_domains();
+  dv_rst_domain por_domain;
+
+  // The power-on reset applies to the always-on interface and nothing else. The three resets
+  // that fall with it are asserted by the always-on driver, which is the component that owns
+  // those interfaces.
+  por_domain = dv_rst_domain::type_id::create("por_domain");
+  por_domain.clk_rst_vif = cfg.slow_clk_rst_vif;
+
+  cfg.reset_domain = por_domain;
+  // The base assigned the clock/reset agent the domain it built. Point the agent at the one
+  // that is actually the power-on reset, or it would drive the fast interface instead.
+  cfg.clk_rst_agt_cfg.reset_domain = cfg.reset_domain;
+
+  cfg.fast_reset_domain = pwrmgr_derived_rst_domain::type_id::create("fast_reset_domain");
+  cfg.fast_reset_domain.clk_rst_vif = cfg.clk_rst_vif;
+
+  cfg.lc_reset_domain = pwrmgr_derived_rst_domain::type_id::create("lc_reset_domain");
+  cfg.lc_reset_domain.clk_rst_vif = cfg.lc_clk_rst_vif;
+
+  cfg.esc_reset_domain = pwrmgr_derived_rst_domain::type_id::create("esc_reset_domain");
+  cfg.esc_reset_domain.clk_rst_vif = cfg.esc_clk_rst_vif;
+
+  // The bus runs on the fast clock, so it recovers on the fast domain's reset rather than on
+  // the power-on reset. It is assigned here rather than left to the inherited path because
+  // that path hands every bus agent the primary domain.
+  foreach (cfg.m_tl_agent_cfgs[i]) begin
+    cfg.m_tl_agent_cfgs[i].reset_domain = cfg.fast_reset_domain;
+  end
+endfunction : build_reset_domains
+
+
+function void pwrmgr_rst_safe_env::build_block_agents();
+  cfg.m_aon_agent_cfg = pwrmgr_aon_agent_cfg::type_id::create("m_aon_agent_cfg");
+  `DV_CHECK_RANDOMIZE_FATAL(cfg.m_aon_agent_cfg)
+  cfg.m_aon_agent_cfg.vif               = cfg.pwrmgr_vif;
+  cfg.m_aon_agent_cfg.fast_clk_rst_vif  = cfg.clk_rst_vif;
+  cfg.m_aon_agent_cfg.lc_clk_rst_vif    = cfg.lc_clk_rst_vif;
+  cfg.m_aon_agent_cfg.esc_clk_rst_vif   = cfg.esc_clk_rst_vif;
+  cfg.m_aon_agent_cfg.en_cov            = cfg.en_cov;
+  // Alive across every reset it has to restore for the other domains.
+  cfg.m_aon_agent_cfg.reset_domain      = cfg.reset_domain;
+
+  cfg.m_fast_agent_cfg = pwrmgr_fast_agent_cfg::type_id::create("m_fast_agent_cfg");
+  `DV_CHECK_RANDOMIZE_FATAL(cfg.m_fast_agent_cfg)
+  cfg.m_fast_agent_cfg.vif              = cfg.pwrmgr_vif;
+  cfg.m_fast_agent_cfg.lc_clk_rst_vif   = cfg.lc_clk_rst_vif;
+  cfg.m_fast_agent_cfg.esc_clk_rst_vif  = cfg.esc_clk_rst_vif;
+  cfg.m_fast_agent_cfg.en_cov           = cfg.en_cov;
+  // Not the lc reset: this agent grants that one, and nothing can be reset by what it drives.
+  cfg.m_fast_agent_cfg.reset_domain     = cfg.fast_reset_domain;
+
+  m_aon_agent = pwrmgr_aon_rst_safe_agent::type_id::create("m_aon_agent", this);
+  uvm_config_db#(pwrmgr_aon_agent_cfg)::set(this, "m_aon_agent*", "cfg", cfg.m_aon_agent_cfg);
+
+  m_fast_agent = pwrmgr_fast_rst_safe_agent::type_id::create("m_fast_agent", this);
+  uvm_config_db#(pwrmgr_fast_agent_cfg)::set(this, "m_fast_agent*", "cfg", cfg.m_fast_agent_cfg);
+
+  m_esc_agent = alert_esc_agent::type_id::create("m_esc_agent", this);
+  uvm_config_db#(alert_esc_agent_cfg)::set(this, "m_esc_agent", "cfg", cfg.m_esc_agent_cfg);
+  cfg.m_esc_agent_cfg.en_cov = cfg.en_cov;
+endfunction : build_block_agents
+
+
+function void pwrmgr_rst_safe_env::connect_phase(uvm_phase phase);
+  super.connect_phase(phase);
+
+  m_aon_agent.monitor.wakeup_port.connect(scoreboard.wakeup_fifo.analysis_export);
+  m_aon_agent.monitor.reset_req_port.connect(scoreboard.reset_req_fifo.analysis_export);
+  m_fast_agent.monitor.active_port.connect(scoreboard.active_fifo.analysis_export);
+  m_fast_agent.monitor.low_power_port.connect(scoreboard.low_power_fifo.analysis_export);
+  m_fast_agent.monitor.intr_port.connect(scoreboard.intr_fifo.analysis_export);
+
+  // The same publications also reach the sequencer, which is how a sequence waits for something
+  // the device announced rather than watching a pin.
+  m_fast_agent.monitor.active_port.connect(virtual_sequencer.active_fifo.analysis_export);
+  m_fast_agent.monitor.low_power_port.connect(virtual_sequencer.low_power_fifo.analysis_export);
+  m_fast_agent.monitor.intr_port.connect(virtual_sequencer.intr_fifo.analysis_export);
+
+  virtual_sequencer.aon_sequencer_h  = m_aon_agent.sequencer;
+  virtual_sequencer.fast_sequencer_h = m_fast_agent.sequencer;
+endfunction : connect_phase
