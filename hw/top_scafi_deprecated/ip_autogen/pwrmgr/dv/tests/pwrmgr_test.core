@@ -11,6 +11,7 @@ filesets:
     files:
       - pwrmgr_test_pkg.sv
       - pwrmgr_base_test.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_base_test.sv: {is_include_file: true}
     file_type: systemVerilogSource
 
 targets:

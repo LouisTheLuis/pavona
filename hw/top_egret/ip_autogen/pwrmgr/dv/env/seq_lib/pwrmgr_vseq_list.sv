@@ -21,3 +21,8 @@
 `include "pwrmgr_disable_rom_integrity_check_vseq.sv"
 `include "pwrmgr_reset_invalid_vseq.sv"
 `include "pwrmgr_lowpower_invalid_vseq.sv"
+
+// Reset-safe path.
+`include "pwrmgr_rand_rst_safe_base_vseq.sv"
+`include "pwrmgr_rst_safe_smoke_vseq.sv"
+`include "pwrmgr_rst_safe_smoke_with_rand_reset_vseq.sv"

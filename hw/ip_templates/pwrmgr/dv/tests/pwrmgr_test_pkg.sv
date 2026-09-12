@@ -18,5 +18,6 @@ package pwrmgr_test_pkg;
 
   // package sources
   `include "pwrmgr_base_test.sv"
+  `include "pwrmgr_rst_safe_base_test.sv"
 
 endpackage

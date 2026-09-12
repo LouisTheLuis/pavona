@@ -75,6 +75,18 @@
       run_opts: ["+test_timeout_ns=1000000"]
     }
     {
+      name: pwrmgr_rst_safe_smoke
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_smoke_vseq
+      run_opts: ["+test_timeout_ns=2000000"]
+    }
+    {
+      name: pwrmgr_rst_safe_smoke_with_rand_reset
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_smoke_with_rand_reset_vseq
+      run_opts: ["+test_timeout_ns=4000000"]
+    }
+    {
       name: pwrmgr_reset
       uvm_test_seq: pwrmgr_reset_vseq
       run_opts: ["+test_timeout_ns=1000000"]
@@ -154,6 +166,10 @@
     {
       name: smoke
       tests: ["pwrmgr_smoke"]
+    }
+    {
+      name: rst_safe
+      tests: ["pwrmgr_rst_safe_smoke", "pwrmgr_rst_safe_smoke_with_rand_reset"]
     }
   ]
 }

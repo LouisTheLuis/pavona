@@ -9,12 +9,15 @@ package pwrmgr_env_pkg;
   import dv_utils_pkg::*;
   import dv_lib_pkg::*;
   import tl_agent_pkg::*;
+  // reset_seq and delay_seq, started by the reset-safe sequences on the inherited sequencers.
+  import clk_rst_agent_pkg::*;
   import cip_base_pkg::*;
   import dv_base_reg_pkg::*;
   import csr_utils_pkg::*;
   import pwrmgr_ral_pkg::*;
   import alert_esc_agent_pkg::*;
   import pwrmgr_pkg::PowerDomains;
+  import rv_core_ibex_pkg::CPU_PWRMGR_DEFAULT;
   import prim_mubi_pkg::mubi4_t;
   import prim_mubi_pkg::MuBi4False;
   import prim_mubi_pkg::MuBi4True;
@@ -65,6 +68,23 @@ package pwrmgr_env_pkg;
 % endfor
   } control_enables_t;
 
+  // Names the port a monitor has just written, published alongside the item so that events
+  // arriving on different ports can be put back in order by a consumer.
+  typedef enum int {
+    PwrmgrAonWakeup,
+    PwrmgrAonResetReq,
+    PwrmgrAonAstReq,
+    PwrmgrAonGlitch
+  } pwrmgr_aon_obs_kind_e;
+
+  typedef enum int {
+    PwrmgrFastActive,
+    PwrmgrFastLowPower,
+    PwrmgrFastStrap,
+    PwrmgrFastIntr,
+    PwrmgrFastPeerReq
+  } pwrmgr_fast_obs_kind_e;
+
   typedef bit [pwrmgr_reg_pkg::NumWkups-1:0] wakeups_t;
   typedef bit [pwrmgr_reg_pkg::NumRstReqs-1:0] resets_t;
 
@@ -83,11 +103,40 @@ package pwrmgr_env_pkg;
   logic low_power_hint;
 
   // package sources
+  `include "pwrmgr_derived_rst_domain.sv"
+  `include "pwrmgr_aon_item.sv"
+  `include "pwrmgr_obs_items.sv"
+  `include "pwrmgr_aon_agent_cfg.sv"
+
+  typedef dv_base_sequencer #(.ITEM_T(pwrmgr_aon_item),
+                              .CFG_T (pwrmgr_aon_agent_cfg)) pwrmgr_aon_sequencer;
+
+  `include "pwrmgr_aon_rst_safe_driver.sv"
+  `include "pwrmgr_aon_rst_safe_monitor.sv"
+  `include "pwrmgr_aon_rst_safe_agent.sv"
+  `include "pwrmgr_aon_seq.sv"
+
+  `include "pwrmgr_fast_item.sv"
+  `include "pwrmgr_fast_agent_cfg.sv"
+
+  typedef dv_base_sequencer #(.ITEM_T(pwrmgr_fast_item),
+                              .CFG_T (pwrmgr_fast_agent_cfg)) pwrmgr_fast_sequencer;
+
+  `include "pwrmgr_fast_rst_safe_driver.sv"
+  `include "pwrmgr_fast_rst_safe_monitor.sv"
+  `include "pwrmgr_fast_rst_safe_agent.sv"
+  `include "pwrmgr_fast_seq.sv"
   `include "pwrmgr_env_cfg.sv"
   `include "pwrmgr_env_cov.sv"
   `include "pwrmgr_virtual_sequencer.sv"
   `include "pwrmgr_scoreboard.sv"
   `include "pwrmgr_env.sv"
+
+  // Reset-safe path. Built alongside the normal one above, which keeps working unchanged.
+  `include "pwrmgr_rst_safe_env_cov.sv"
+  `include "pwrmgr_rst_safe_virtual_sequencer.sv"
+  `include "pwrmgr_rst_safe_scoreboard.sv"
+  `include "pwrmgr_rst_safe_env.sv"
   `include "pwrmgr_vseq_list.sv"
 
 endpackage

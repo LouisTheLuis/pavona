@@ -14,14 +14,35 @@ filesets:
       - ${instance_vlnv("lowrisc:constants:top_pkg")}
     files:
       - pwrmgr_env_pkg.sv
+      - pwrmgr_derived_rst_domain.sv: {is_include_file: true}
+      - pwrmgr_aon_item.sv: {is_include_file: true}
+      - pwrmgr_obs_items.sv: {is_include_file: true}
+      - pwrmgr_aon_agent_cfg.sv: {is_include_file: true}
+      - pwrmgr_aon_rst_safe_driver.sv: {is_include_file: true}
+      - pwrmgr_aon_rst_safe_monitor.sv: {is_include_file: true}
+      - pwrmgr_aon_rst_safe_agent.sv: {is_include_file: true}
+      - pwrmgr_aon_seq.sv: {is_include_file: true}
+      - pwrmgr_fast_item.sv: {is_include_file: true}
+      - pwrmgr_fast_agent_cfg.sv: {is_include_file: true}
+      - pwrmgr_fast_rst_safe_driver.sv: {is_include_file: true}
+      - pwrmgr_fast_rst_safe_monitor.sv: {is_include_file: true}
+      - pwrmgr_fast_rst_safe_agent.sv: {is_include_file: true}
+      - pwrmgr_fast_seq.sv: {is_include_file: true}
       - pwrmgr_env_cfg.sv: {is_include_file: true}
       - pwrmgr_env_cov.sv: {is_include_file: true}
       - pwrmgr_if.sv
       - pwrmgr_virtual_sequencer.sv: {is_include_file: true}
       - pwrmgr_scoreboard.sv: {is_include_file: true}
       - pwrmgr_env.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_env_cov.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_virtual_sequencer.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_scoreboard.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_env.sv: {is_include_file: true}
       - seq_lib/pwrmgr_vseq_list.sv: {is_include_file: true}
       - seq_lib/pwrmgr_base_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rand_rst_safe_base_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rst_safe_smoke_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rst_safe_smoke_with_rand_reset_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_aborted_low_power_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_common_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_lowpower_wakeup_race_vseq.sv: {is_include_file: true}
