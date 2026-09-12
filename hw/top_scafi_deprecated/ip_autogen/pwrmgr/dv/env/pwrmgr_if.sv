@@ -227,4 +227,25 @@ interface pwrmgr_if (
     input pwr_otp_req;
     output pwr_otp_rsp;
   endclocking
+
+  // The two clocking blocks below are the whole surface the reset-safe drivers and monitors
+  // use. They exist alongside slow_cb and fast_cb rather than extending them, so the legacy
+  // path keeps exactly the sampling it has today.
+  //
+  // They cover the signals the update_* functions drive, which no clocking block reached,
+  // and the device outputs a monitor has to publish. They deliberately leave out slow_state
+  // and fast_state: those are internal state the reset-safe path predicts rather than reads,
+  // so excluding them here makes that structural instead of a convention.
+  //
+  // wakeups_i, rstreqs_i and sw_rst_req_i sit on the slow clock and the rest on the fast
+  // clock. The device synchronizes all of them internally, so either clock would function;
+  // these follow the domain each one feeds and the clock the legacy sequences already drive
+  // them on, which is the choice least likely to move observed timing.
+  // The driver's view of the always-on side. Everything here is driven by the testbench.
+
+  // The monitor's view of the same signals. Separate from the block above because driving and
+  // observing are different relationships to a signal, in the manner of i2c_if's split between
+  // scl_o and scl_i. What the peripherals ask for has to be observed as well as driven: the
+  // checker cannot predict what the device records without seeing what it was told.
+
 endinterface
