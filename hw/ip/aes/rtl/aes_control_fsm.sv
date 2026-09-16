@@ -840,9 +840,10 @@ module aes_control_fsm
   // Assertions //
   ////////////////
 
-  // Assert that data_in_new becomes 0 after a key_iv_data_in_clear_i
+  // Assert that the tracking of newly written input data is cleared whenever the input data
+  // registers are overwritten with pseudo-random data.
   `ASSERT(DataInNewClear,
-          $fell(key_iv_data_in_clear_i) |-> (data_in_new == 4'h0),
+          data_in_we_o |=> (data_in_new_q == '0),
           clk_i, !rst_ni)
 
   // Create a lint error to reduce the risk of accidentally disabling the masking.
