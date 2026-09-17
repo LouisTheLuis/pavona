@@ -60,6 +60,8 @@ module pwrmgr_bind;
     .rst_ni,
     .clk_slow_i,
     .rst_slow_ni,
+    .rst_lc_ni,
+    .rst_esc_ni,
     .rstreqs_i,
     .reset_en(reg2hw.reset_en),
     .sw_rst_req_i(prim_mubi_pkg::mubi4_test_true_strict(sw_rst_req_i)),
@@ -69,6 +71,14 @@ module pwrmgr_bind;
     .main_pd_n(pwr_ast_o.main_pd_n),
     .reset_cause(pwr_rst_o.reset_cause),
     .rstreqs(pwr_rst_o.rstreqs)
+  );
+
+  bind pwrmgr pwrmgr_intr_sva_if pwrmgr_intr_sva_if (
+    .clk_i,
+    .rst_ni,
+    .intr_test_q(reg2hw.intr_test.q),
+    .intr_test_qe(reg2hw.intr_test.qe),
+    .intr_state_q(reg2hw.intr_state.q)
   );
 
   bind pwrmgr pwrmgr_sec_cm_checker_assert pwrmgr_sec_cm_checker_assert (

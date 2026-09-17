@@ -11,6 +11,8 @@ interface pwrmgr_rstreqs_sva_if
   input logic                    rst_ni,
   input logic                    clk_slow_i,
   input logic                    rst_slow_ni,
+  input logic                    rst_lc_ni,
+  input logic                    rst_esc_ni,
 
    // Input causes resets.
   input logic [ NumRstReqs-1:0]  rstreqs_i,
@@ -43,7 +45,24 @@ interface pwrmgr_rstreqs_sva_if
   bit disable_sva;
   bit reset_or_disable;
 
+  // Suspends only the two checks below, and only while a test has deliberately stopped the
+  // device from forwarding anything. A device wedged in its invalid state cannot honor a
+  // contract about forwarding reset requests, so those two checks describe a device that is
+  // working. Every other check in this interface stays on, because a wedged device is still
+  // expected to keep its escalation and software reset behavior.
+  bit disable_hw_reset_sva;
+  bit hw_reset_disable;
+
   always_comb reset_or_disable = !rst_ni || !rst_slow_ni || disable_sva;
+  always_comb hw_reset_disable = reset_or_disable || disable_hw_reset_sva;
+
+  // The escalation checks below relate a request the device latches on its lifecycle reset to an
+  // output it drives from the always on domain. Either of those resets clears the request with
+  // nothing for the output to answer, so a fall they cause is not the device failing to withdraw
+  // a reset request.
+  bit esc_reset_disable;
+
+  always_comb esc_reset_disable = reset_or_disable || !rst_lc_ni || !rst_esc_ni;
 
   // Reset ins to outs.
   for (genvar rst = 0; rst < NumRstReqs; ++rst) begin : gen_hw_resets
@@ -51,12 +70,12 @@ interface pwrmgr_rstreqs_sva_if
             $rose(
                 rstreqs_i[rst] && reset_en[rst]
             ) |-> `MAIN_RST_CYCLES rstreqs[rst] && reset_cause == HwReq, clk_slow_i,
-            reset_or_disable)
+            hw_reset_disable)
     `ASSERT(HwResetOff_A,
             $fell(
                 rstreqs_i[rst] && reset_en[rst]
             ) |-> `MAIN_RST_CYCLES !rstreqs[rst] && reset_cause != HwReq, clk_slow_i,
-            reset_or_disable)
+            hw_reset_disable)
   end
 
   // This is used to ignore main_rst_req_i (wired to rst_main_n) if it happens during low power,
@@ -89,11 +108,11 @@ interface pwrmgr_rstreqs_sva_if
   `ASSERT(EscRstOn_A,
           $rose(
               esc_rst_req_i
-          ) |-> `ESC_RST_CYCLES rstreqs[ResetEscIdx], clk_i, reset_or_disable)
+          ) |-> `ESC_RST_CYCLES rstreqs[ResetEscIdx], clk_i, esc_reset_disable)
   `ASSERT(EscRstOff_A,
           $fell(
               esc_rst_req_i
-          ) |-> `ESC_RST_CYCLES !rstreqs[ResetEscIdx], clk_i, reset_or_disable)
+          ) |-> `ESC_RST_CYCLES !rstreqs[ResetEscIdx], clk_i, esc_reset_disable)
 
   // Software initiated resets do not affect rstreqs since rstmgr generates them.
   `ASSERT(SwResetSetCause_A,
