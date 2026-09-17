@@ -352,6 +352,18 @@ interface keymgr_dpe_if(input clk, input rst_n);
     return keymgr_dpe_en_sync2 === lc_ctrl_pkg::On;
   endfunction
 
+  // `DEBUG.INACTIVE_LC_EN` is written by hardware from the life cycle enable, so it trails
+  // `keymgr_dpe_en` by two synchronizer flops and the register stage. The input is asynchronous and
+  // the CDC instrumentation delays it further, so a fixed number of cycles does not cover it.
+  //
+  // The wait on the synchronized enable comes first because the bit is low for the one cycle
+  // between reset release and the register taking the `Off` the synchronizer holds out of reset.
+  task automatic wait_lc_en_reflected_in_debug();
+    `DV_SPINWAIT(wait (keymgr_dpe_en_sync2 === lc_ctrl_pkg::On);
+                 wait (tb.dut.u_reg.u_debug_inactive_lc_en.qs === 1'b0);, , 100_000, // TIMEOUT_NS_
+                 msg_id)
+  endtask
+
   function automatic void wipe_sideload_keys();
     is_kmac_key_good <= 0;
 

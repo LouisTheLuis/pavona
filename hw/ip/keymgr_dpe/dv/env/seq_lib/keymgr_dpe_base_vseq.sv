@@ -81,14 +81,10 @@ class keymgr_dpe_base_vseq extends cip_base_vseq #(
   endtask
 
   virtual task delay_after_reset_before_access_csr();
-    bit cdc_instrumentation_enabled;
-    void'($value$plusargs("cdc_instrumentation_enabled=%d", cdc_instrumentation_enabled));
-
-    // Add 2 cycles for design to synchronize life cycle value from async domain to update cfg_en
-    // otherwise, some register programming will be gated
-    cfg.clk_rst_vif.wait_clks(2);
-
-    if (cdc_instrumentation_enabled) cfg.clk_rst_vif.wait_clks(1);
+    // Register programming and `DEBUG.INACTIVE_LC_EN` are both gated on the life cycle enable, so
+    // waiting for that bit to clear covers both, and covers the CDC instrumentation delay that
+    // counting cycles here did not.
+    cfg.keymgr_dpe_vif.wait_lc_en_reflected_in_debug();
   endtask
 
   // setup basic keymgr features
