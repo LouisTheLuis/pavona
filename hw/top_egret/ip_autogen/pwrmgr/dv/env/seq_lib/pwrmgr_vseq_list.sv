@@ -25,5 +25,11 @@
 // Reset-safe path.
 `include "pwrmgr_rand_rst_safe_base_vseq.sv"
 `include "pwrmgr_rst_safe_smoke_vseq.sv"
+`include "pwrmgr_rst_safe_wakeup_vseq.sv"
+`include "pwrmgr_rst_safe_aborted_low_power_vseq.sv"
 `include "pwrmgr_rst_safe_common_vseq.sv"
+`include "pwrmgr_rst_safe_repeat_wakeup_reset_vseq.sv"
+`include "pwrmgr_rst_safe_reset_vseq.sv"
+`include "pwrmgr_rst_safe_sw_reset_vseq.sv"
+`include "pwrmgr_rst_safe_lowpower_wakeup_race_vseq.sv"
 `include "pwrmgr_rst_safe_smoke_with_rand_reset_vseq.sv"
