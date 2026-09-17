@@ -35,27 +35,18 @@ package pwrmgr_env_pkg;
   // parameters
   parameter int NUM_INTERRUPTS = 1;
 
-  // clk enable disable delay
-  // How many bus clock cycles this top fits inside one always-on cycle. Taken from the clock
-  // frequencies the top is built with rather than from a measurement, because the two tops differ
-  // by a large factor: one runs pwrmgr's bus clock at a hundred and twenty times its always-on
-  // clock and the other at four times. Anything the testbench counts in always-on cycles covers
-  // that many times more bus clock work on the first, so a number that lands where it should on
-  // one top lands somewhere else entirely on the other.
-  // The ratio is rounded up, so a top whose two frequencies do not divide exactly is modeled with
-  // an always-on cycle at least as long as the real one rather than a shorter one. Both tops
-  // built today divide exactly, so the rounding does not move either of them.
+  // clk enable disable delay How many bus clock cycles this top fits inside one always-on cycle,
+  // taken from the clock frequencies it is built with. The two tops differ by a large factor, so
+  // anything counted in always-on cycles covers that many times more bus work on one than on the
+  // other. Rounded up, so a top whose frequencies do not divide exactly is modeled with an always-
+  // on cycle at least as long as the real one.
   parameter uint BusCyclesPerAonCycle = ${bus_cycles_per_aon_cycle};
 
-  // How long one low power operation takes, in always-on cycles. Measured on both tops as about
-  // twenty three always-on cycles of handshaking between the two domains plus about fifty bus
-  // clock cycles of work, and the bus part costs fewer always-on cycles the wider the ratio is.
-  // A reset meant to land inside the operation has to be placed against this rather than against
-  // a count taken on one top: the same number of always-on cycles overshoots on a top that fits
-  // more bus clock work into each of them.
-  // The bus part is rounded up to a whole always-on cycle: fifty bus cycles is less than one
-  // always-on cycle on a top with a wide ratio, and truncating it to zero would claim the
-  // operation is shorter than it is.
+  // How long one low power operation takes, in always-on cycles: about twenty three cycles of
+  // handshaking between the two domains plus about fifty bus cycles of work, and the bus part costs
+  // fewer always-on cycles the wider the ratio. A reset meant to land inside the operation is
+  // placed against this rather than a count taken on one top. The bus part is rounded up to a whole
+  // always-on cycle, since truncating it to zero would claim the operation is shorter than it is.
   parameter uint LowPowerOpAonCycles = 23 + (50 + BusCyclesPerAonCycle - 1) / BusCyclesPerAonCycle;
 
   parameter uint MAIN_CLK_DELAY_MIN = 15;
@@ -101,7 +92,8 @@ package pwrmgr_env_pkg;
     PwrmgrAonWakeup,
     PwrmgrAonResetReq,
     PwrmgrAonAstReq,
-    PwrmgrAonGlitch
+    PwrmgrAonGlitch,
+    PwrmgrAonClkValid
   } pwrmgr_aon_obs_kind_e;
 
   typedef enum int {
@@ -109,8 +101,67 @@ package pwrmgr_env_pkg;
     PwrmgrFastLowPower,
     PwrmgrFastStrap,
     PwrmgrFastIntr,
-    PwrmgrFastPeerReq
+    PwrmgrFastPeerReq,
+    PwrmgrFastHwWrite,
+    PwrmgrFastFsmState,
+    PwrmgrFastStim,
+    PwrmgrFastEscTimeout
   } pwrmgr_fast_obs_kind_e;
+
+  // How many past values of a hardware written register are kept for checking a read. A read is
+  // answered from whatever the device holds at that instant, so it is checked against several.
+  parameter uint VolatileReadHistoryDepth = 16;
+
+  // How many flops the device puts between a driven input and the logic that reads it. The
+  // processor sleeping, the flash idle and the otp response cross through a two flop synchronizer,
+  // so a decision was taken on the value from this many cycles earlier. The lifecycle idle has none
+  // and is read directly.
+  parameter uint SyncFlops = 2;
+
+  // Cycles a crossing can take beyond those flops. The delay elements inside `prim_flop_2sync` hold
+  // a change back one further cycle when the clock domain crossing instrumentation is on, and each
+  // input crosses on its own, so the value the device acted on came from somewhere in a window
+  // rather than from one cycle. Predictions span the window so they hold either way.
+  parameter uint CdcJitterCycles = 1;
+
+  // How many driven changes to keep so a prediction can ask what the device could see. Only a
+  // few cycles are ever looked back over, but stimulus changes arrive in bursts.
+  parameter uint StimHistoryDepth = 32;
+
+  // How long the invalid state tests keep asking a wedged device to act. The reset that frees it is
+  // scheduled up to 60 delay steps in and each round spends four, so this covers the range.
+  parameter uint InvalidStateHoldRounds = 20;
+
+  // Delay steps spent between one piece of stimulus and the next while the device is wedged.
+  parameter uint InvalidStateHoldSteps = 1;
+
+  // How long to take the escalation clock away in the round that checks a short interruption is
+  // tolerated, kept well short of the device's own count. This is the magnitude of the stimulus,
+  // not a wait.
+  parameter uint EscTimeoutSafeCycles = pwrmgr_pkg::EscTimeOutCnt / 4;
+
+  // When the escalation path has been broken for this long the device raises its fatal alert. It is
+  // the device's own count and not a cycle more: an expectation is met only by an alert arriving
+  // after it, so announcing late leaves it standing against an alert already gone.
+  parameter uint EscTimeoutDetectCycles = pwrmgr_pkg::EscTimeOutCnt;
+
+  // Giving the escalation clock back does not clear the device's count. `prim_clock_timeout` clears
+  // on an acknowledgment `prim_sync_reqack` returns, a round trip through two synchronizers, so
+  // until the escalation clock has run for it the count stands where the interruption left it. This
+  // bounds that round trip rather than reproducing it: a count already cleared in the device may
+  // still be standing here, but it must not clear here while the device is still counting.
+  parameter uint EscTimeoutAckCycles = 8;
+
+  // How long a sequence waits for something the device announces before giving up. Long enough for
+  // a slow domain crossing and a full boot, short enough to fail with a clear message instead of
+  // the phase timeout. It lives here because the stress wrapper waits on the same announcements.
+  // How long the framework waits for the fatal alert after a fault is predicted. It has to outlast
+  // the device resetting itself, which clears the fault status and withdraws the alert, and that
+  // walk is paced by the always-on clock. Counted in bus cycles, so it grows with the ratio.
+  parameter uint FatalAlertMaxDelay = 500 * BusCyclesPerAonCycle / 4;
+
+  parameter uint FastObsTimeoutAonCycles = 2_000;
+
 
   typedef bit [pwrmgr_reg_pkg::NumWkups-1:0] wakeups_t;
   typedef bit [pwrmgr_reg_pkg::NumRstReqs-1:0] resets_t;

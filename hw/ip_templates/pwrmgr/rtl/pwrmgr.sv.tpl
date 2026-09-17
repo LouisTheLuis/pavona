@@ -194,11 +194,10 @@ module pwrmgr
     end
   end
 
-  localparam int EscTimeOutCnt = 128;
   logic esc_timeout, esc_timeout_lc_d, esc_timeout_lc_q;
   // SEC_CM: ESC_RX.CLK.BKGN_CHK, ESC_RX.CLK.LOCAL_ESC
   prim_clock_timeout #(
-    .TimeOutCnt(EscTimeOutCnt)
+    .TimeOutCnt(pwrmgr_pkg::EscTimeOutCnt)
   ) u_esc_timeout (
     .clk_chk_i(clk_esc),
     .rst_chk_ni(rst_esc_n),
@@ -810,7 +809,7 @@ module pwrmgr
   //VCS coverage on
   // pragma coverage on
 
-  `ASSERT(ClkRatio_A, cnt < EscTimeOutCnt)
+  `ASSERT(ClkRatio_A, cnt < pwrmgr_pkg::EscTimeOutCnt)
 
   `endif
 

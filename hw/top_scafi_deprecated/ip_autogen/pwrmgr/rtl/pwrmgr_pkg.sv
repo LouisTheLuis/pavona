@@ -13,6 +13,12 @@ package pwrmgr_pkg;
   // variables referenced by other modules / packages
   parameter int PowerDomains = 2; // this needs to be a topgen populated number, or from topcfg?
 
+  // How long the escalation clock may be absent before the device decides escalation has stopped
+  // working. Declared here rather than inside the module so the testbench derives its own
+  // constants from it instead of keeping copies: a checker has to announce the timeout no later
+  // than this, and stimulus meant to be tolerated has to stay well short of it.
+  parameter int EscTimeOutCnt = 128;
+
   // variables referenced only by pwrmgr
   localparam int TotalWakeWidth = pwrmgr_reg_pkg::NumWkups + 2; // Abort and fall through are added
 
