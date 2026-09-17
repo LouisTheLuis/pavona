@@ -41,3 +41,5 @@
 `include "pwrmgr_rst_safe_lowpower_wakeup_race_vseq.sv"
 `include "pwrmgr_rst_safe_smoke_with_rand_reset_vseq.sv"
 `include "pwrmgr_rst_safe_disable_rom_integrity_check_vseq.sv"
+`include "pwrmgr_rst_safe_stress_all_vseq.sv"
+`include "pwrmgr_rst_safe_stress_all_with_rand_reset_vseq.sv"

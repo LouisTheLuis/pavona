@@ -50,6 +50,8 @@ filesets:
       - seq_lib/pwrmgr_rst_safe_glitch_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_common_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_disable_rom_integrity_check_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rst_safe_stress_all_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rst_safe_stress_all_with_rand_reset_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_repeat_wakeup_reset_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_reset_invalid_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_lowpower_invalid_vseq.sv: {is_include_file: true}
