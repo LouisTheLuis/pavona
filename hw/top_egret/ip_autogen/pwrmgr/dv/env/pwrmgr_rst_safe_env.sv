@@ -156,11 +156,18 @@ endfunction : build_block_agents
 function void pwrmgr_rst_safe_env::connect_phase(uvm_phase phase);
   super.connect_phase(phase);
 
+  m_aon_agent.monitor.aon_dir_port.connect(scoreboard.aon_dir_fifo.analysis_export);
+  m_fast_agent.monitor.fast_dir_port.connect(scoreboard.fast_dir_fifo.analysis_export);
+  m_aon_agent.monitor.clk_valid_port.connect(scoreboard.clk_valid_fifo.analysis_export);
+  m_aon_agent.monitor.glitch_port.connect(scoreboard.glitch_fifo.analysis_export);
+  m_fast_agent.monitor.esc_timeout_port.connect(scoreboard.esc_timeout_fifo.analysis_export);
   m_aon_agent.monitor.wakeup_port.connect(scoreboard.wakeup_fifo.analysis_export);
   m_aon_agent.monitor.reset_req_port.connect(scoreboard.reset_req_fifo.analysis_export);
   m_fast_agent.monitor.active_port.connect(scoreboard.active_fifo.analysis_export);
   m_fast_agent.monitor.low_power_port.connect(scoreboard.low_power_fifo.analysis_export);
   m_fast_agent.monitor.intr_port.connect(scoreboard.intr_fifo.analysis_export);
+  m_fast_agent.monitor.stim_port.connect(scoreboard.stim_fifo.analysis_export);
+  m_fast_agent.monitor.fsm_port.connect(scoreboard.fsm_fifo.analysis_export);
   m_fast_agent.monitor.fsm_port.connect(virtual_sequencer.fsm_fifo.analysis_export);
 
   // The same publications also reach the sequencer, which is how a sequence waits for something
