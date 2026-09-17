@@ -43,6 +43,7 @@ filesets:
       - seq_lib/pwrmgr_rand_rst_safe_base_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_smoke_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_rst_safe_smoke_with_rand_reset_vseq.sv: {is_include_file: true}
+      - seq_lib/pwrmgr_rst_safe_common_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_aborted_low_power_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_common_vseq.sv: {is_include_file: true}
       - seq_lib/pwrmgr_lowpower_wakeup_race_vseq.sv: {is_include_file: true}

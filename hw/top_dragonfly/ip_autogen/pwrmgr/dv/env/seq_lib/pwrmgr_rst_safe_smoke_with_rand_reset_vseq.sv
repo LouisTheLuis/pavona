@@ -18,12 +18,9 @@ class pwrmgr_rst_safe_smoke_with_rand_reset_test_seq_parameters
 endclass : pwrmgr_rst_safe_smoke_with_rand_reset_test_seq_parameters
 
 
-// The smoke flow with the power-on reset enabled, so reset lands while the device is in the
-// middle of a low power transition or a wakeup.
-//
-// Nothing about the functional work changes, which is what makes the two forms comparable: the
-// only difference is the test shape, supplied by overriding the parameter type. The inherited
-// body still owns the reset loop.
+// The smoke flow with the power-on reset enabled, so reset lands in the middle of a transition or a
+// wakeup. Nothing about the functional work changes, which is what makes the two comparable: only
+// the test shape differs, and the inherited body still owns the reset loop.
 class pwrmgr_rst_safe_smoke_with_rand_reset_vseq extends pwrmgr_rst_safe_smoke_vseq;
 
   `uvm_object_utils(pwrmgr_rst_safe_smoke_with_rand_reset_vseq)

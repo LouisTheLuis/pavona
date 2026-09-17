@@ -40,12 +40,10 @@ endfunction : new
 
 
 task pwrmgr_rst_safe_smoke_vseq::main_thread();
-  // The bus is not usable when this thread starts. The power-on reset releasing brings back the
-  // always-on domain, while the registers live in the fast domain and return only once the device
-  // has asked for its clock again, which is several microseconds later. The device reporting that
-  // the processor may run is what says that has happened, so the first register access waits for
-  // it. Issuing before then leaves the access queued on a sequencer that is still in reset.
-  wait_for_device_active();
+  // The registers return only once the device has asked for its clock, and the device reporting
+  // that the processor may run is what says that happened, so the first access waits for it. Under
+  // the stress wrapper the device is already up and this stands down.
+  wait_for_device_active_at_start();
 
   for (int unsigned i = 0; i < test_params.num_trans; i++) begin
     `DV_CHECK_RANDOMIZE_FATAL(config_params)
@@ -84,10 +82,8 @@ task pwrmgr_rst_safe_smoke_vseq::run_low_power_wakeup();
   set_wakeups(config_params.wakeups);
   wait_for_device_active();
 
-  // Read what the device recorded about why it woke. The values are not compared here: these
-  // registers are written by hardware, so the scoreboard predicts them from the stimulus the
-  // device was given and checks the read against that. A sequence comparing them against what it
-  // just asked for would only be checking itself.
+  // Read what the device recorded about why it woke. Not compared here: these are written by
+  // hardware, so the scoreboard predicts them from the stimulus and checks the read against that.
   wait_for_wakeup_interrupt();
   csr_rd(.ptr(ral.wake_status[0]), .value(rd_value));
   csr_rd(.ptr(ral.wake_info.reasons), .value(rd_value));
