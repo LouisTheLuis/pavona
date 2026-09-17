@@ -4,20 +4,14 @@
 
 // Drives the always-on side of the device.
 //
-// Two things happen here and they are not the same kind of thing. Answering the device's power
-// and clock requests is what AST always does, so it runs on its own and no test asks for it.
-// Telling the device that a peripheral wants a wakeup or a reset is stimulus, so it arrives as
-// an item. Both live under get_and_drive() because the base class kills that one thread at
-// reset, and killing it takes the sub processes with it.
+// AST's answers to the power and clock requests run on their own; wakeup and reset requests are
+// stimulus and arrive as items. Both live under get_and_drive(), because the base class kills that
+// thread at reset and takes its sub processes with it.
 //
-// This driver also restores the fast, lc and esc clocks, and releases the fast domain's reset.
-// Those belong here because they are consequences of the answer it just gave: the clocks exist
-// only while AST says the clock is valid, and rstmgr cannot release a leaf reset until that
-// clock is running again.
+// It also restores the fast, lc and esc clocks and releases the fast domain's reset, which follow
+// from the answer just given.
 //
-// A template because the clock handshake below is written once per clock the top has, and which
-// clocks exist is decided when the top is built. The monitor and the agent have no per clock code,
-// so they are plain source.
+// A template because the clock handshake is written once per clock the top has.
 class pwrmgr_aon_rst_safe_driver extends dv_rst_safe_base_driver #(
     .ITEM_T(pwrmgr_aon_item),
     .CFG_T (pwrmgr_aon_agent_cfg)
@@ -40,6 +34,27 @@ class pwrmgr_aon_rst_safe_driver extends dv_rst_safe_base_driver #(
   extern protected task clear_peripheral_requests_on_lc_reset();
   extern protected task manage_fast_domain();
   extern protected task set_alert_clocks(bit running);
+
+  extern protected task manage_esc_domain();
+  // What a test has asked of the escalation side. Read by the two managers above, the only things
+  // that touch those pins. The always-on domain's index into the reset vectors, matching
+  // rstmgr_pkg::DomainAonSel.
+  localparam int unsigned AonDomainSel = 0;
+
+  // The three levels the device sees on this side. Held here and nowhere else, so the withdrawal
+  // below and a later item cannot disagree about what is being driven.
+  protected wakeups_t         held_wakeups;
+  protected resets_t          held_rstreqs;
+  protected bit [MUBI4W-1:0]  held_sw_rst_req = MuBi4False;
+  // Escalation is held the same way. Without this, an item about something else would carry the
+  // item's default and drop the escalation pins, so every sequence would have to restate values
+  // it has no interest in.
+  protected bit               held_escalation_reset;
+  protected bit               held_esc_clk_stopped;
+  protected bit               held_esc_rst_asserted;
+  protected bit               esc_clk_malfunction_req;
+  protected bit               esc_rst_malfunction_req;
+
   extern protected task drive_items();
   extern protected task drive_item(pwrmgr_aon_item item);
 endclass : pwrmgr_aon_rst_safe_driver
@@ -50,6 +65,7 @@ task pwrmgr_aon_rst_safe_driver::get_and_drive();
     answer_ast_requests();
     clear_peripheral_requests_on_lc_reset();
     manage_fast_domain();
+    manage_esc_domain();
     drive_items();
   join
 endtask : get_and_drive
@@ -59,12 +75,25 @@ function void pwrmgr_aon_rst_safe_driver::reset_interface_and_driver();
   // AST has nothing to report until the device asks again. These are the values it presents at
   // power on.
   cfg.vif.pwr_ast_rsp  <= '0;
-  cfg.vif.wakeups_i    <= '0;
-  cfg.vif.rstreqs_i    <= '0;
-  cfg.vif.sw_rst_req_i <= MuBi4False;
+  held_wakeups    = '0;
+  held_rstreqs    = '0;
+  held_sw_rst_req = MuBi4False;
+  held_escalation_reset = 1'b0;
+  held_esc_clk_stopped  = 1'b0;
+  held_esc_rst_asserted = 1'b0;
+  cfg.vif.wakeups_i    <= held_wakeups;
+  cfg.vif.rstreqs_i    <= held_rstreqs;
+  cfg.vif.sw_rst_req_i <= mubi4_t'(held_sw_rst_req);
   cfg.vif.main_pwr_glitch_n <= 1'b1;
 
   io_clk_valid = 1'b0;
+
+  // Nothing has been asked of the escalation side, and the signalling sits in the encoding that
+  // says nothing is being escalated. This agent owns those, so it is what puts them back.
+  esc_clk_malfunction_req = 1'b0;
+  esc_rst_malfunction_req = 1'b0;
+  cfg.esc_vif.esc_tx_int.esc_p = 1'b0;
+  cfg.esc_vif.esc_tx_int.esc_n = 1'b1;
 
   // The device's clock requests reset to zero, so AST stops providing the clocks. The alert
   // clocks go with them: the side that pings is as unclocked as the sender it pings while the
@@ -74,16 +103,11 @@ function void pwrmgr_aon_rst_safe_driver::reset_interface_and_driver();
   cfg.esc_clk_rst_vif.stop_clk();
   foreach (cfg.alert_clk_rst_vifs[i]) cfg.alert_clk_rst_vifs[i].stop_clk();
 
-  // The device's other three resets are leaves of the power-on reset: rstmgr builds each from a
-  // synchronizer that this reset clears directly, so they fall in the same instant with no clock
-  // involved. This function runs at that instant, which is why they are asserted here.
+  // The device's other three resets are leaves of the power-on reset, built from synchronizers this
+  // reset clears directly, so they fall in the same instant with no clock involved.
   //
-  // They are released elsewhere and deliberately not here: a leaf comes back only once its clock
-  // is running, which the device has to ask for. The fast domain's reset is released by
-  // manage_fast_domain() below, and the lc and esc resets by the fast driver, which grants them.
-  //
-  // Assigned rather than driven through drive_rst_pin(), because that is a task and this is a
-  // function. The assignment is what the task does.
+  // They are released elsewhere: a leaf comes back only once its clock is running. Assigned rather
+  // than driven through drive_rst_pin(), which is a task where this is a function.
   cfg.fast_clk_rst_vif.o_rst_n = 1'b0;
   cfg.lc_clk_rst_vif.o_rst_n   = 1'b0;
   cfg.esc_clk_rst_vif.o_rst_n  = 1'b0;
@@ -126,15 +150,20 @@ task pwrmgr_aon_rst_safe_driver::answer_ast_requests();
 endtask : answer_ast_requests
 
 
-// The peripherals that raise reset requests sit in the lc reset domain, so granting an lc reset
-// resets them too and they stop asking. Without this the device would find the request still
-// asserted when it came back and reset again immediately, without end. The lc reset pin is
-// driven by the fast agent, which is the component that grants it.
+// The peripherals raising reset requests sit in the lc reset domain, so granting an lc reset stops
+// them asking. Without it the device would find the request still asserted and reset again,
+// endlessly.
 task pwrmgr_aon_rst_safe_driver::clear_peripheral_requests_on_lc_reset();
   forever begin
     @(negedge cfg.lc_clk_rst_vif.rst_n);
-    cfg.vif.rstreqs_i    <= '0;
-    cfg.vif.sw_rst_req_i <= MuBi4False;
+
+    // The peripherals that raise these sit in the lifecycle reset domain, so granting that reset
+    // resets them and they stop asking. The held values move with the pins: if only the pins were
+    // cleared, the next item would put back whatever was being driven before.
+    held_rstreqs    = '0;
+    held_sw_rst_req = MuBi4False;
+    cfg.vif.rstreqs_i    <= held_rstreqs;
+    cfg.vif.sw_rst_req_i <= mubi4_t'(held_sw_rst_req);
   end
 endtask : clear_peripheral_requests_on_lc_reset
 
@@ -153,6 +182,62 @@ task pwrmgr_aon_rst_safe_driver::set_alert_clocks(bit running);
   end
 endtask : set_alert_clocks
 
+// The one place that starts and stops the escalation clock, so the device powering down and a test
+// breaking the path cannot take it from each other.
+//
+// The device decides its escalation path has failed if that clock stops while it expects it, and
+// the counter deciding this is held by the escalation reset. Any interval where the reset is
+// released and the clock is not ticking is a failure it can see, so the clock starts before the
+// reset is released and the reset is asserted before the clock stops. A test breaking the path on
+// purpose is the exception.
+task pwrmgr_aon_rst_safe_driver::manage_esc_domain();
+  forever begin
+    // Down: the reset goes on first, then the clock goes away.
+    //
+    // The alert handler driving the escalation pair shares this reset on a real device, so keeping
+    // the pair asserted across the domain going down would hand the receiver an escalation it
+    // cannot acknowledge in time and it would report a protocol error. The malfunction requests are
+    // left alone, since they are what holds this reset.
+    held_escalation_reset = 1'b0;
+    cfg.esc_vif.esc_tx_int.esc_p <= 1'b0;
+    cfg.esc_vif.esc_tx_int.esc_n <= 1'b1;
+
+    cfg.esc_clk_rst_vif.drive_rst_pin(1'b0);
+    cfg.esc_clk_rst_vif.stop_clk();
+
+    wait (io_clk_valid === 1'b1 &&
+          cfg.vif.pwr_rst_rsp.rst_lc_src_n[AonDomainSel] === 1'b1);
+
+    // Up: the clock runs first, and only once it is ticking does the reset come off.
+    cfg.esc_clk_rst_vif.start_clk();
+    @(posedge cfg.esc_clk_rst_vif.clk);
+    cfg.esc_clk_rst_vif.drive_rst_pin(1'b1);
+
+    // Held here while the domain is up. A test breaking the path takes the clock away without
+    // the reset; the device is meant to notice that and reset itself, which brings us back
+    // round through the domain going down.
+    fork
+      begin : wait_domain_down
+        wait (io_clk_valid === 1'b0 ||
+              cfg.vif.pwr_rst_rsp.rst_lc_src_n[AonDomainSel] === 1'b0);
+      end
+      begin : serve_malfunction
+        forever begin
+          wait (esc_clk_malfunction_req || esc_rst_malfunction_req);
+          if (esc_clk_malfunction_req) cfg.esc_clk_rst_vif.stop_clk();
+          if (esc_rst_malfunction_req) cfg.esc_clk_rst_vif.drive_rst_pin(1'b0);
+
+          wait (!esc_clk_malfunction_req && !esc_rst_malfunction_req);
+          cfg.esc_clk_rst_vif.start_clk();
+          @(posedge cfg.esc_clk_rst_vif.clk);
+          cfg.esc_clk_rst_vif.drive_rst_pin(1'b1);
+        end
+      end
+    join_any
+    disable fork;
+  end
+endtask : manage_esc_domain
+
 
 task pwrmgr_aon_rst_safe_driver::manage_fast_domain();
   forever begin
@@ -161,6 +246,7 @@ task pwrmgr_aon_rst_safe_driver::manage_fast_domain();
     cfg.lc_clk_rst_vif.start_clk();
     cfg.esc_clk_rst_vif.start_clk();
     set_alert_clocks(1'b1);
+
 
     // The requirement is that the clock is running before the leaf can be released, not that a
     // particular number of cycles has passed. One edge establishes that; counting cycles beyond
@@ -180,6 +266,7 @@ task pwrmgr_aon_rst_safe_driver::manage_fast_domain();
     cfg.lc_clk_rst_vif.stop_clk();
     cfg.esc_clk_rst_vif.stop_clk();
     set_alert_clocks(1'b0);
+
   end
 endtask : manage_fast_domain
 
@@ -194,12 +281,46 @@ endtask : drive_items
 
 
 task pwrmgr_aon_rst_safe_driver::drive_item(pwrmgr_aon_item item);
-  cfg.vif.wakeups_i    <= item.wakeups;
-  cfg.vif.rstreqs_i    <= item.rstreqs;
-  cfg.vif.sw_rst_req_i <= item.sw_rst_req;
+  repeat (item.apply_delay_cycles) @(posedge cfg.vif.clk_slow);
+
+  if (item.change_wakeups)    held_wakeups    = item.wakeups;
+  if (item.change_rstreqs)    held_rstreqs    = item.rstreqs;
+  if (item.change_sw_rst_req) held_sw_rst_req = item.sw_rst_req;
+  if (item.change_escalation) begin
+    held_escalation_reset = item.escalation_reset;
+    held_esc_clk_stopped  = item.esc_clk_stopped;
+    held_esc_rst_asserted = item.esc_rst_asserted;
+  end
+
+  cfg.vif.wakeups_i    <= held_wakeups;
+  cfg.vif.rstreqs_i    <= held_rstreqs;
+  cfg.vif.sw_rst_req_i <= mubi4_t'(held_sw_rst_req);
   @(posedge cfg.vif.clk_slow);
 
+  cfg.esc_vif.esc_tx_int.esc_p <= held_escalation_reset;
+  cfg.esc_vif.esc_tx_int.esc_n <= ~held_escalation_reset;
+
+  esc_rst_malfunction_req = held_esc_rst_asserted;
+  if (held_esc_clk_stopped && item.esc_clk_stopped_cycles > 0) begin
+    // A measured interruption. Counted on the clock the device counts, which is running
+    // because this only makes sense while the device is up.
+    esc_clk_malfunction_req = 1'b1;
+    repeat (item.esc_clk_stopped_cycles) @(posedge cfg.fast_clk_rst_vif.clk);
+    esc_clk_malfunction_req = 1'b0;
+    // The interruption is not over when the clock comes back: the device's count is cleared by an
+    // acknowledgment that crosses into the escalation domain and back, so the clock has to run for
+    // that round trip. Handing control back sooner merges two interruptions into one.
+    repeat (EscTimeoutAckCycles) @(posedge cfg.esc_clk_rst_vif.clk);
+    // A measured interruption is one action rather than a state to stay in. The clock is back, so
+    // the held value goes with it; leaving it set would have the next item, which says nothing
+    // about escalation, stop the clock again and never start it.
+    held_esc_clk_stopped = 1'b0;
+  end else begin
+    esc_clk_malfunction_req = held_esc_clk_stopped;
+  end
+
   if (item.power_glitch) begin
+    cfg.vif.disable_power_glitch_assertion();
     cfg.vif.main_pwr_glitch_n <= 1'b0;
     repeat (item.glitch_width_slow_clks) @(posedge cfg.vif.clk_slow);
     cfg.vif.main_pwr_glitch_n <= 1'b1;

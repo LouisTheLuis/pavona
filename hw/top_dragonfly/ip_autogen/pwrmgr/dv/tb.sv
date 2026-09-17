@@ -50,6 +50,8 @@ module tb;
   assign interrupts[0] = pwrmgr_if.intr_wakeup;
   assign int_reset_req = tb.dut.internal_reset_req;
 
+  // Reports the registers the device writes itself, at the moment it commits them.
+
   pwrmgr_if pwrmgr_if (
     .clk,
     .rst_n,
@@ -137,6 +139,8 @@ module tb;
         null, "*.env", "pwrmgr_clock_enables_sva_vif", dut.pwrmgr_clock_enables_sva_if);
     uvm_config_db#(virtual pwrmgr_rstmgr_sva_if)::set(null, "*.env", "pwrmgr_rstmgr_sva_vif",
                                                       dut.pwrmgr_rstmgr_sva_if);
+    uvm_config_db#(virtual pwrmgr_rstreqs_sva_if)::set(null, "*.env", "pwrmgr_rstreqs_sva_vif",
+                                                       dut.pwrmgr_rstreqs_sva_if);
     $timeformat(-12, 0, " ps", 12);
     run_test();
   end // initial begin

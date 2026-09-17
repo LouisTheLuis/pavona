@@ -205,6 +205,36 @@ interface pwrmgr_if (
     rom_ctrl_i[index] = ctrl;
   endfunction
 
+  // The design asserts that the slow state machine never sees an internal reset request. A main
+  // power glitch is exactly that, so the assertion is stood down the first time one is applied.
+  // The reset-safe driver applies the glitch itself and calls this; the legacy task below does
+  // both together.
+  task automatic disable_power_glitch_assertion();
+    if (!internal_assertion_disabled) begin
+      internal_assertion_disabled = 1'b1;
+      `uvm_info("pwrmgr_if", "disabling power glitch related SVA", UVM_MEDIUM)
+      $assertoff(1, tb.dut.u_slow_fsm.IntRstReq_A);
+    end
+  endtask
+
+  // Drives the input the slow state machine uses to tell the fast one to give up. This is the path
+  // the design itself takes into the invalid state, so the encoding stays legal. The fast machine
+  // holds that state until a reset, so the input only has to stay up long enough to be registered.
+  //
+  // This applies the override and returns, and must not time the release: the design drives the
+  // signal from a flop on the device's own reset, so the override has to come off with one. The
+  // driver takes it off in the hook the framework calls on reset, which runs on a thread a reset
+  // does not kill.
+  function automatic void force_invalid_state();
+    force tb.dut.u_fast_fsm.fsm_invalid_i = 1'b1;
+  endfunction
+
+  // Takes the override off. Safe to call when nothing is forced, so the reset path can call it
+  // unconditionally rather than tracking whether an injection was in flight.
+  function automatic void release_invalid_state();
+    release tb.dut.u_fast_fsm.fsm_invalid_i;
+  endfunction
+
   // Sends a main power glitch and disables a design assertion that trips for power glitches.
   task automatic glitch_power_reset();
     main_pwr_glitch_n = 1'b0;

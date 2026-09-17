@@ -43,6 +43,11 @@ class pwrmgr_env extends cip_base_env #(
         )) begin
       `uvm_fatal(`gfn, "failed to get pwrmgr_rstmgr_sva_vif from uvm_config_db")
     end
+    if (!uvm_config_db#(virtual pwrmgr_rstreqs_sva_if)::get(
+            this, "", "pwrmgr_rstreqs_sva_vif", cfg.pwrmgr_rstreqs_sva_vif
+        )) begin
+      `uvm_fatal(`gfn, "failed to get pwrmgr_rstreqs_sva_vif from uvm_config_db")
+    end
 
     m_esc_agent = alert_esc_agent::type_id::create("m_esc_agent", this);
     uvm_config_db#(alert_esc_agent_cfg)::set(this, "m_esc_agent", "cfg", cfg.m_esc_agent_cfg);

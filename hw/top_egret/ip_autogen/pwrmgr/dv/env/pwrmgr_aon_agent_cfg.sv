@@ -23,6 +23,11 @@ class pwrmgr_aon_agent_cfg extends dv_base_agent_cfg;
   // clock source, so it is the one that takes these away and gives them back.
   virtual clk_rst_if alert_clk_rst_vifs[$];
 
+  // The escalation signalling. The whole escalation side is driven from this agent, because it
+  // is the one running on a clock that never stops and so the only one that can still act when
+  // the device takes the fast domain's clocks away.
+  virtual alert_esc_if esc_vif;
+
   // How long AST takes to answer, in slow clock cycles. These are randomized once when the
   // configuration is built and then left alone, because a response already in flight must not
   // have its delay changed underneath it: two requests close together would otherwise be

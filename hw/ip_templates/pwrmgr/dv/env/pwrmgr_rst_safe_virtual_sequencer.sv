@@ -22,11 +22,17 @@ class pwrmgr_rst_safe_virtual_sequencer extends cip_base_virtual_sequencer #(
   uvm_tlm_analysis_fifo #(pwrmgr_active_item) active_fifo;
   uvm_tlm_analysis_fifo #(pwrmgr_flag_item)   low_power_fifo;
   uvm_tlm_analysis_fifo #(pwrmgr_flag_item)   intr_fifo;
+  // Whether the device's fast clock is running. A sequence uses this to tell a transition the
+  // device abandoned from one it completed: only a completed one takes the clock away.
+  uvm_tlm_analysis_fifo #(pwrmgr_flag_item)   clk_valid_fifo;
+  // So a sequence can wait for the state machine to be corrupted without looking at it.
+  uvm_tlm_analysis_fifo #(pwrmgr_fsm_item)    fsm_fifo;
 
   extern function new(string name = "", uvm_component parent = null);
   extern virtual function void build_phase(uvm_phase phase);
   extern virtual function void handle_reset_assertion();
 endclass : pwrmgr_rst_safe_virtual_sequencer
+
 
 
 function pwrmgr_rst_safe_virtual_sequencer::new(string name = "", uvm_component parent = null);
@@ -39,6 +45,8 @@ function void pwrmgr_rst_safe_virtual_sequencer::build_phase(uvm_phase phase);
   active_fifo    = new("active_fifo", this);
   low_power_fifo = new("low_power_fifo", this);
   intr_fifo      = new("intr_fifo", this);
+  clk_valid_fifo = new("clk_valid_fifo", this);
+  fsm_fifo       = new("fsm_fifo", this);
 endfunction : build_phase
 
 
@@ -47,4 +55,6 @@ function void pwrmgr_rst_safe_virtual_sequencer::handle_reset_assertion();
   active_fifo.flush();
   low_power_fifo.flush();
   intr_fifo.flush();
+  clk_valid_fifo.flush();
+  fsm_fifo.flush();
 endfunction : handle_reset_assertion

@@ -15,6 +15,14 @@ class pwrmgr_fast_agent_cfg extends dv_base_agent_cfg;
   virtual clk_rst_if lc_clk_rst_vif;
   virtual clk_rst_if esc_clk_rst_vif;
 
+  // The escalation pair. The shared escalation agent's sender driver is unimplemented by
+  // design, so a sequence can only reach this interface by writing it directly, which the
+  // reset-safe path does not allow. Modelling the alert handler here keeps escalation as
+  // stimulus carried by an item and keeps the pin in a driver.
+  virtual alert_esc_if esc_vif;
+
+  // Reports the registers the device writes itself, at the moment it commits them.
+
   // How long each peer takes to answer, in fast clock cycles. Randomized once when the
   // configuration is built and then left alone, so that answers already in flight keep the
   // order their requests arrived in.

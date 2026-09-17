@@ -4,18 +4,14 @@
 
 // Drives the fast side of the device.
 //
-// As on the always-on side, two different things live here. Granting the resets the device asks
-// for, reporting the clocks it enables, and answering the otp and lifecycle initialization
-// requests are what those peers always do, so they run without a test asking. What the
-// processor and the non-volatile blocks are doing, and what the rom check reports, is stimulus
-// and arrives as an item.
+// Granting resets, reporting clocks, and answering the otp and lifecycle initialization requests
+// are what those peers always do, so they run without a test asking. What the processor and the
+// non-volatile blocks are doing, and what the rom check reports, is stimulus and arrives as an
+// item.
 //
-// This driver also drives the lifecycle and escalation reset pins. Those follow the grant it has
-// just issued, and this driver is not itself reset by them, so it can hold one asserted and
-// release it later without the process doing the holding being torn down part way through.
+// It also drives the lc and esc reset pins, which follow the grant it issued and do not reset it.
 //
-// A template for the same reason as the always-on driver: reporting clock status is written once
-// per clock the top has, and the set of clocks is decided when the top is built.
+// A template for the same reason as the always-on driver.
 class pwrmgr_fast_rst_safe_driver extends dv_rst_safe_base_driver #(
     .ITEM_T(pwrmgr_fast_item),
     .CFG_T (pwrmgr_fast_agent_cfg)
@@ -32,6 +28,18 @@ class pwrmgr_fast_rst_safe_driver extends dv_rst_safe_base_driver #(
   // that decides when they move.
   localparam int unsigned AonDomainSel = 0;
 
+  // The pins this driver holds between items, so an item states only what it changes. Reset puts
+  // them back to what the device is released into.
+  protected bit held_core_sleeping;
+  protected bit held_ndmreset_req;
+  protected bit held_flash_idle;
+  protected bit held_otp_idle;
+  protected bit held_lc_idle;
+  protected bit [lc_ctrl_pkg::TxWidth-1:0] held_lc_hw_debug_en;
+  protected bit [lc_ctrl_pkg::TxWidth-1:0] held_lc_dft_en;
+  protected mubi4_t held_rom_done[pwrmgr_reg_pkg::NumRomInputs];
+  protected mubi4_t held_rom_good[pwrmgr_reg_pkg::NumRomInputs];
+
   // What this driver last granted, read by the process that drives the leaf reset pins so that
   // it follows the answer given rather than sampling a pin back.
   protected logic granted_lc_src_n;
@@ -39,6 +47,11 @@ class pwrmgr_fast_rst_safe_driver extends dv_rst_safe_base_driver #(
   // Set once a test has taken control of the rom responses, so the model below stops presenting
   // its own and the test's choice stands.
   protected bit rom_driven_by_item;
+  // A test asking for the processor to run again just after the device commits to a low power
+  // transition. Held here because this driver owns both the input and the answer the device waits
+  // on.
+  protected bit wake_processor_on_entry_req;
+  protected bit hold_clk_status;
 
   extern virtual task get_and_drive();
   extern virtual function void reset_interface_and_driver();
@@ -46,6 +59,12 @@ class pwrmgr_fast_rst_safe_driver extends dv_rst_safe_base_driver #(
   extern protected task answer_peer_requests();
   extern protected task model_rom_check();
   extern protected task manage_lc_reset();
+  extern protected task manage_invalid_state_forcing();
+  // Whether a test has asked for the invalid state, and from where. Served by the process above
+  // rather than while an item is being driven.
+  protected bit                          force_invalid_requested;
+  protected pwrmgr_pkg::fast_pwr_state_e invalid_at_state;
+  extern protected task manage_processor_wake_on_entry();
   extern protected task drive_items();
   extern protected task drive_item(pwrmgr_fast_item item);
 endclass : pwrmgr_fast_rst_safe_driver
@@ -56,6 +75,8 @@ task pwrmgr_fast_rst_safe_driver::get_and_drive();
     answer_peer_requests();
     model_rom_check();
     manage_lc_reset();
+    manage_processor_wake_on_entry();
+    manage_invalid_state_forcing();
     drive_items();
   join
 endtask : get_and_drive
@@ -81,11 +102,32 @@ function void pwrmgr_fast_rst_safe_driver::reset_interface_and_driver();
   cfg.vif.lc_hw_debug_en <= lc_ctrl_pkg::Off;
   cfg.vif.lc_dft_en      <= lc_ctrl_pkg::Off;
 
-  // The rom has not finished checking itself yet. A rom that already reported a good result at
-  // the instant reset released would be a convenience rather than a model: the real block holds
-  // done low until its check completes, and the device waits for it before reaching active.
-  // model_rom_check() reports the result afterwards.
-  rom_driven_by_item = 1'b0;
+  held_core_sleeping  = 1'b0;
+  held_ndmreset_req   = 1'b0;
+  held_flash_idle     = 1'b1;
+  held_otp_idle       = 1'b1;
+  held_lc_idle        = 1'b1;
+  held_lc_hw_debug_en = lc_ctrl_pkg::Off;
+  held_lc_dft_en      = lc_ctrl_pkg::Off;
+  for (int unsigned i = 0; i < pwrmgr_reg_pkg::NumRomInputs; i++) begin
+    held_rom_done[i] = MuBi4True;
+    held_rom_good[i] = MuBi4True;
+  end
+
+  // The alert handler is reset too, so it stops escalating. Driving the idle encoding rather
+  // than clearing to zero, because the pair is differential and an undriven receiver input
+  // leaves the device's escalation output unknown.
+
+  // The rom has not finished checking itself yet: the real block holds done low until its check
+  // completes, and the device waits for it before reaching active. Any invalid-state override goes
+  // with the reset, because the signal it overrides is a flop on this reset. Unconditional, since
+  // the item thread that asked may have been killed part way through.
+  cfg.vif.release_invalid_state();
+
+  rom_driven_by_item          = 1'b0;
+  wake_processor_on_entry_req = 1'b0;
+  force_invalid_requested     = 1'b0;
+  hold_clk_status             = 1'b0;
   for (int unsigned i = 0; i < pwrmgr_reg_pkg::NumRomInputs; i++) begin
     cfg.vif.rom_ctrl_i[i] <= rom_ctrl_pkg::PWRMGR_DATA_DEFAULT;
   end
@@ -132,12 +174,14 @@ task pwrmgr_fast_rst_safe_driver::answer_peer_requests();
     cfg.vif.pwr_rst_rsp.rst_sys_src_n <=
         ~rst_sys_pipe[cfg.cycles_before_rst_sys_src];
 
-    // clkmgr reports back the enable it was given.
-    cfg.vif.pwr_clk_rsp.main_status <=
+    // clkmgr reports back the enable it was given, unless a wake is being placed against the start
+    // of a low power transition. Holding this answer holds the device, which is what lets the wake
+    // be placed.
+    if (!hold_clk_status) cfg.vif.pwr_clk_rsp.main_status <=
         clk_pipe[cfg.cycles_before_clk_status].main_ip_clk_en;
-    cfg.vif.pwr_clk_rsp.io_status <=
+    if (!hold_clk_status) cfg.vif.pwr_clk_rsp.io_status <=
         clk_pipe[cfg.cycles_before_clk_status].io_ip_clk_en;
-    cfg.vif.pwr_clk_rsp.usb_status <=
+    if (!hold_clk_status) cfg.vif.pwr_clk_rsp.usb_status <=
         clk_pipe[cfg.cycles_before_clk_status].usb_ip_clk_en;
 
     cfg.vif.pwr_lc_rsp.lc_done   <= lc_init_pipe[cfg.cycles_before_lc_done];
@@ -163,17 +207,66 @@ task pwrmgr_fast_rst_safe_driver::model_rom_check();
 endtask : model_rom_check
 
 
+// Wakes the processor just after the device commits to a low power transition.
+//
+// The request is honored from the device being active: one placed while it is still coming up
+// waits, rather than withdrawing the processor from a transition that never began. The wake lands
+// when the device leaves that state, which is the transition starting.
+//
+// There is no window to hit. The clock manager's answer is held from the moment the device is
+// active until the wake has landed, and the device cannot reach the state where it asks whether
+// the processor is still asleep until that answer arrives.
+task pwrmgr_fast_rst_safe_driver::manage_processor_wake_on_entry();
+  forever begin
+    wait (wake_processor_on_entry_req);
+
+    // The state, not the fetch enable: the item drives the processor asleep as it lands, so the
+    // device can assign the enable off in the same cycle it would have assigned it on, and a wait
+    // on that enable rising never returns.
+    wait (cfg.vif.fast_state == pwrmgr_pkg::FastPwrStateActive);
+    hold_clk_status = 1'b1;
+
+    wait (cfg.vif.fast_state != pwrmgr_pkg::FastPwrStateActive);
+    // The held value moves with the pin, or the next item, which says nothing about the processor,
+    // would put it back to sleep.
+    held_core_sleeping = 1'b0;
+    cfg.vif.pwr_cpu.core_sleeping <= 1'b0;
+    @(posedge cfg.vif.clk);
+
+    hold_clk_status             = 1'b0;
+    wake_processor_on_entry_req = 1'b0;
+  end
+endtask : manage_processor_wake_on_entry
+
+
+// Evaluated every cycle, like the thing it watches. If a test named a state and the machine is in
+// it, send it now; nothing waits and nothing is held.
+task pwrmgr_fast_rst_safe_driver::manage_invalid_state_forcing();
+  forever begin
+    @(posedge cfg.vif.clk);
+
+    if (force_invalid_requested && cfg.vif.fast_state == invalid_at_state) begin
+      force_invalid_requested = 1'b0;
+      `uvm_info(`gfn, $sformatf("Sending the state machine to invalid from %0s",
+                                invalid_at_state.name()), UVM_MEDIUM)
+      cfg.vif.force_invalid_state();
+    end
+  end
+endtask : manage_invalid_state_forcing
+
+
+// Grants the lifecycle reset only. The escalation reset moves with the escalation clock, which the
+// always-on driver owns, because the device reads a released reset with a stopped clock as the
+// escalation path having failed.
 task pwrmgr_fast_rst_safe_driver::manage_lc_reset();
   forever begin
     wait (granted_lc_src_n === 1'b0);
     cfg.lc_clk_rst_vif.drive_rst_pin(1'b0);
-    cfg.esc_clk_rst_vif.drive_rst_pin(1'b0);
 
     wait (granted_lc_src_n === 1'b1);
     // One edge to establish that the clock is running, not a cycle count.
     @(posedge cfg.lc_clk_rst_vif.clk);
     cfg.lc_clk_rst_vif.drive_rst_pin(1'b1);
-    cfg.esc_clk_rst_vif.drive_rst_pin(1'b1);
   end
 endtask : manage_lc_reset
 
@@ -187,29 +280,65 @@ task pwrmgr_fast_rst_safe_driver::drive_items();
 endtask : drive_items
 
 
+// Nothing is waited for at the end. Every item restates the whole of its side, so an item
+// overwritten before it lands loses nothing. Waiting would hold the item open across a low power
+// window, where this driver's clock is taken away.
 task pwrmgr_fast_rst_safe_driver::drive_item(pwrmgr_fast_item item);
   pwrmgr_pkg::pwrmgr_cpu_t       cpu;
   rv_core_ibex_pkg::cpu_pwrmgr_t pwr_cpu;
 
-  cpu.ndmreset_req      = item.ndmreset_req;
-  pwr_cpu.core_sleeping = item.core_sleeping;
+  repeat (item.apply_delay_cycles) @(posedge cfg.vif.clk);
 
-  // Synchronize to the clock first and drive after, so every value on this interface changes on
-  // a known edge rather than wherever the item happened to arrive.
-  @(posedge cfg.vif.clk);
+  if (item.change_core_sleeping) held_core_sleeping = item.core_sleeping;
+  if (item.change_ndmreset_req)  held_ndmreset_req  = item.ndmreset_req;
+  if (item.change_idles) begin
+    held_flash_idle = item.flash_idle;
+    held_otp_idle   = item.otp_idle;
+    held_lc_idle    = item.lc_idle;
+  end
+  if (item.change_lc) begin
+    held_lc_hw_debug_en = item.lc_hw_debug_en;
+    held_lc_dft_en      = item.lc_dft_en;
+  end
+  // A test answering for the rom takes the answer over for good. model_rom_check() stands down
+  // once this is set, so the driver's own reply cannot arrive later and overwrite what was asked
+  // for; the reset puts both back.
+  if (item.change_rom) begin
+    rom_driven_by_item = 1'b1;
+    for (int unsigned i = 0; i < pwrmgr_reg_pkg::NumRomInputs; i++) begin
+      held_rom_done[i] = item.rom_done[i];
+      held_rom_good[i] = item.rom_good[i];
+    end
+  end
+
+  cpu.ndmreset_req      = held_ndmreset_req;
+  pwr_cpu.core_sleeping = held_core_sleeping;
 
   cfg.vif.cpu_i   <= cpu;
   cfg.vif.pwr_cpu <= pwr_cpu;
 
-  cfg.vif.pwr_flash.flash_idle <= item.flash_idle;
-  cfg.vif.pwr_otp_rsp.otp_idle <= item.otp_idle;
-  cfg.vif.pwr_lc_rsp.lc_idle   <= item.lc_idle;
+  cfg.vif.pwr_flash.flash_idle <= held_flash_idle;
+  cfg.vif.pwr_otp_rsp.otp_idle <= held_otp_idle;
+  cfg.vif.pwr_lc_rsp.lc_idle   <= held_lc_idle;
 
-  cfg.vif.lc_hw_debug_en <= item.lc_hw_debug_en;
-  cfg.vif.lc_dft_en      <= item.lc_dft_en;
-
-  rom_driven_by_item = 1'b1;
-  foreach (item.rom_done[i]) begin
-    cfg.vif.rom_ctrl_i[i] <= '{done: item.rom_done[i], good: item.rom_good[i]};
+  if (rom_driven_by_item) begin
+    for (int unsigned i = 0; i < pwrmgr_reg_pkg::NumRomInputs; i++) begin
+      cfg.vif.rom_ctrl_i[i] <= '{done: held_rom_done[i], good: held_rom_good[i]};
+    end
   end
+
+  cfg.vif.lc_hw_debug_en <= lc_ctrl_pkg::lc_tx_t'(held_lc_hw_debug_en);
+  cfg.vif.lc_dft_en      <= lc_ctrl_pkg::lc_tx_t'(held_lc_dft_en);
+
+  // Corrupting the state machine. The sequence named the state; waiting for it belongs here. The
+  // corruption goes through the fault interface bound to every sparse state machine. Asked for, not
+  // served here: manage_processor_wake_on_entry() places it, because a driver serving an item must
+  // not block.
+  if (item.wake_processor_on_entry) wake_processor_on_entry_req = 1'b1;
+
+  if (item.force_fsm_invalid) begin
+    invalid_at_state = item.invalid_at_state;
+    force_invalid_requested = 1'b1;
+  end
+
 endtask : drive_item

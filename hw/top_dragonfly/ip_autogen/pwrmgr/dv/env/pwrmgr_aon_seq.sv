@@ -21,6 +21,27 @@ class pwrmgr_aon_seq extends dv_base_seq #(
   // fields the request is about and what the rest should be left at.
   pwrmgr_aon_item item;
 
+  // Which peripherals are asking for a reset. The item's own constraint keeps these clear, so a
+  // test that wants them has to say so.
+  resets_t rstreqs_value;
+
+  // A glitch on the main power supply, and how long it lasts in slow clock cycles.
+  bit          escalation_reset_value;
+  bit          esc_clk_stopped_value;
+  int unsigned esc_clk_stopped_cycles_value = 0;
+  bit          esc_rst_asserted_value;
+
+  bit power_glitch_value;
+  int unsigned glitch_width_slow_clks_value = 1;
+
+  // What rstmgr is forwarding from software. Only the true encoding requests a reset; the
+  // others are the interesting negative cases and have to be reachable.
+  bit [MUBI4W-1:0] sw_rst_req_value = MuBi4False;
+
+  // Cycles the driver waits before applying, so two inputs can be placed relative to one
+  // another without a delay in the sequence.
+  int unsigned apply_delay_cycles = 0;
+
   `uvm_object_utils(pwrmgr_aon_seq)
 
   function new(string name = "");
