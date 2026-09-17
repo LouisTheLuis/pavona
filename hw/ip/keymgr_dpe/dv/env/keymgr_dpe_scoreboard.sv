@@ -113,9 +113,41 @@ class keymgr_dpe_scoreboard extends cip_base_scoreboard #(
     rsp_fifo = new("rsp_fifo", this);
   endfunction
 
+  // Operation error alerts the design has not decided on yet.
+  int unsigned unresolved_op_err_alerts;
+
+  // Two operation errors close together can share one alert, so one expectation per failing
+  // operation is wrong. Hold the operation alert back for `resolve_op_err_alerts` to decide, and
+  // pass every other alert straight through.
+  virtual function void set_exp_alert(string alert_name, bit is_fatal = 0, int max_delay = 4);
+    if (alert_name == "recov_operation_err") begin
+      unresolved_op_err_alerts++;
+    end else begin
+      super.set_exp_alert(alert_name, is_fatal, max_delay);
+    end
+  endfunction
+
+  // Expect an alert only if the request is still asserted at the next point the sender can take it.
+  // A busy sender may drop the request at the acknowledgment it is waiting on, so wait that out: an
+  // error absorbed there gets no expectation. An idle sender sends at once, so register in the same
+  // step rather than waiting, or the handshake starts first.
+  virtual task resolve_op_err_alerts();
+    forever begin
+      wait (unresolved_op_err_alerts > 0);
+      `DV_SPINWAIT_EXIT(
+          while (!cfg.keymgr_dpe_vif.op_err_alert_sender_idle()) cfg.clk_rst_vif.wait_clks(1);,
+          wait (cfg.under_reset);)
+      if (!cfg.under_reset && cfg.keymgr_dpe_vif.op_err_alert_requested()) begin
+        super.set_exp_alert("recov_operation_err");
+      end
+      unresolved_op_err_alerts--;
+    end
+  endtask
+
   task run_phase(uvm_phase phase);
     super.run_phase(phase);
     fork
+      resolve_op_err_alerts();
       forever begin
         kmac_app_item item;
         req_fifo.get(item);
@@ -1543,6 +1575,7 @@ class keymgr_dpe_scoreboard extends cip_base_scoreboard #(
     sw_data_a_array.delete();
     hw_data_a_array.delete();
     cfg.keymgr_dpe_vif.reset();
+    unresolved_op_err_alerts = 0;
   endfunction
 
   function void check_phase(uvm_phase phase);

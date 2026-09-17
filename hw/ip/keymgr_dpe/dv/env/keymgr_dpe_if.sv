@@ -364,6 +364,17 @@ interface keymgr_dpe_if(input clk, input rst_n);
                  msg_id)
   endtask
 
+  // The alert request is a level, `|err_code`, dropped at an acknowledgment only if software has
+  // cleared the error by then. The sender takes it whenever idle, so whether an operation error
+  // gets an alert of its own depends on the request at the next idle, not on anything at the error.
+  function automatic bit op_err_alert_sender_idle();
+    return tb.dut.u_op_err_alert.state_q == tb.dut.u_op_err_alert.Idle;
+  endfunction
+
+  function automatic bit op_err_alert_requested();
+    return tb.dut.op_err_req_q;
+  endfunction
+
   function automatic void wipe_sideload_keys();
     is_kmac_key_good <= 0;
 
