@@ -51,7 +51,7 @@
               is high.
             '''
       stage: V2S
-      tests: ["pwrmgr_sec_cm_lc_ctrl_intersig_mubi"]
+      tests: ["pwrmgr_rst_safe_sec_cm_lc_ctrl_intersig_mubi"]
     }
     {
       name: sec_cm_rom_ctrl_intersig_mubi
@@ -68,7 +68,7 @@
               tb.dut.rom_ctrl_i
             '''
       stage: V2S
-      tests: ["pwrmgr_wakeup_reset", "pwrmgr_repeat_wakeup_reset"]
+      tests: ["pwrmgr_rst_safe_repeat_wakeup_reset"]
     }
     {
       name: sec_cm_rstmgr_intersig_mubi
@@ -84,7 +84,7 @@
               tb.dut.sw_rst_req_i
             '''
       stage: V2S
-      tests: ["pwrmgr_sec_cm_rstmgr_intersig_mubi"]
+      tests: ["pwrmgr_rst_safe_sec_cm_rstmgr_intersig_mubi"]
     }
     {
       name: sec_cm_esc_rx_clk_bkgn_chk
@@ -103,7 +103,7 @@
               see if dut is back to normal operation state.
             '''
       stage: V2S
-      tests: ["pwrmgr_esc_clk_rst_malfunc"]
+      tests: ["pwrmgr_rst_safe_esc_clk_rst_malfunc"]
     }
     {
       name: sec_cm_esc_rx_clk_local_esc
@@ -160,7 +160,7 @@
               set when dut receives esc_rst_tx_i
             '''
       stage: V2S
-      tests: ["pwrmgr_global_esc"]
+      tests: ["pwrmgr_rst_safe_global_esc"]
     }
     {
       name: sec_cm_main_pd_rst_local_esc
@@ -175,7 +175,7 @@
             - Add assertion to see if we get pwr_rst_o.rstreqs[ResetMainPwrIdx]
             '''
       stage: V2S
-      tests: ["pwrmgr_glitch"]
+      tests: ["pwrmgr_rst_safe_glitch"]
     }
     {
       name: sec_cm_ctrl_config_regwen
@@ -193,7 +193,7 @@
               the csr update attempt.
             '''
       stage: V2S
-      tests: ["pwrmgr_sec_cm_ctrl_config_regwen"]
+      tests: ["pwrmgr_rst_safe_sec_cm_ctrl_config_regwen"]
     }
     {
       name: sec_cm_wakeup_config_regwen
@@ -202,7 +202,7 @@
             This is covered by auto csr test.
             '''
       stage: V2S
-      tests: ["pwrmgr_csr_rw"]
+      tests: ["pwrmgr_rst_safe_csr_rw"]
     }
     {
       name: sec_cm_reset_config_regwen
@@ -211,7 +211,7 @@
             This is covered by auto csr test.
             '''
       stage: V2S
-      tests: ["pwrmgr_csr_rw"]
+      tests: ["pwrmgr_rst_safe_csr_rw"]
     }
   ]
 }

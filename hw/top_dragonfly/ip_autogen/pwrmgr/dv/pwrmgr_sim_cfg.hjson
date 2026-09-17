@@ -29,9 +29,10 @@
                 // Common CIP test lists
                 "{proj_root}/hw/dv/tools/dvsim/tests/csr_tests.hjson",
                 "{proj_root}/hw/dv/tools/dvsim/tests/intr_test.hjson",
-                "{proj_root}/hw/dv/tools/dvsim/tests/stress_tests.hjson",
                 "{proj_root}/hw/dv/tools/dvsim/tests/sec_cm_tests.hjson",
-                "{proj_root}/hw/dv/tools/dvsim/tests/tl_access_tests.hjson"]
+                "{proj_root}/hw/dv/tools/dvsim/tests/tl_access_tests.hjson",
+                // Declares the two reset-safe stress tests against the reset-safe base test.
+                "{proj_root}/hw/dv/tools/dvsim/tests/rst_safe_stress_tests.hjson"]
 
   // Exclusion files
   vcs_cov_excl_files: ["{self_dir}/cov/pwrmgr_cov_manual_excl.el"]
@@ -64,8 +65,12 @@
   uvm_test: pwrmgr_base_test
   uvm_test_seq: pwrmgr_base_vseq
 
-  // Enable cdc instrumentation.
-  run_opts: ["+cdc_instrumentation_enabled=1"]
+  // Turn cdc instrumentation off. It delays each bit of a vector crossing a clock domain
+  // independently, so a register the device writes from another domain can be read part way
+  // through a change, holding a mixture of the value before and the value after. Every register
+  // this block reports its wakeup state through is such a vector, and no model of them can say
+  // which mixtures are reachable.
+  run_opts: ["+cdc_instrumentation_enabled=0"]
 
   // Timeouts are written as a number of bus clock cycles and converted by `time_from_cycles`
   // above. The bus clock is the one to count: nearly all of the time in these tests is register
@@ -74,94 +79,204 @@
   // List of test specifications.
   tests: [
     {
-      name: pwrmgr_smoke
-      uvm_test_seq: pwrmgr_smoke_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
       name: pwrmgr_rst_safe_smoke
       uvm_test: pwrmgr_rst_safe_base_test
       uvm_test_seq: pwrmgr_rst_safe_smoke_vseq
       run_opts: ["+test_timeout_ns=5760000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_wakeup
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_wakeup_vseq
+      run_opts: ["+test_timeout_ns=11520000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_aborted_low_power
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_aborted_low_power_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_reset
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_reset_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_glitch
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_glitch_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_global_esc
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_global_esc_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_escalation_timeout
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_escalation_timeout_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_esc_clk_rst_malfunc
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_esc_clk_rst_malfunc_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_sec_cm_ctrl_config_regwen
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_sec_cm_ctrl_config_regwen_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_lowpower_invalid
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_lowpower_invalid_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_reset_invalid
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_reset_invalid_vseq
+      run_opts: ["+test_timeout_ns=23040000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_repeat_wakeup_reset
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_repeat_wakeup_reset_vseq
+      run_opts: ["+test_timeout_ns=57600000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_sw_reset
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_sw_reset_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_lowpower_wakeup_race
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_lowpower_wakeup_race_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
     }
     {
       name: pwrmgr_rst_safe_smoke_with_rand_reset
       uvm_test: pwrmgr_rst_safe_base_test
       uvm_test_seq: pwrmgr_rst_safe_smoke_with_rand_reset_vseq
       run_opts: ["+test_timeout_ns=11520000"]
+      reseed: 50
+    }
+    // The two below are declared by the imported reset-safe stress list; only the seed count is
+    // set here. Each run walks several of the ported sequences on a device that is not reset
+    // between them, so a seed is long and a few of them cover more than many short ones would.
+    {
+      name: pwrmgr_rst_safe_disable_rom_integrity_check
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_disable_rom_integrity_check_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
+    }
+    // The two security countermeasure tests below are the reset-safe forms of the legacy
+    // intersignal mubi pair. Neither had a sequence of its own: the legacy tests are existing
+    // sequences with a mode plusarg that forks a thread poking the lifecycle pins directly. The
+    // reset-safe sequences drive the same corruption through the agent, so the mode is part of what
+    // they do rather than something switched on from outside, and the entries name them directly.
+    {
+      name: pwrmgr_rst_safe_sec_cm_lc_ctrl_intersig_mubi
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_repeat_wakeup_reset_vseq
+      run_opts: ["+test_timeout_ns=17280000"]
+      reseed: 50
     }
     {
-      name: pwrmgr_reset
-      uvm_test_seq: pwrmgr_reset_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
+      name: pwrmgr_rst_safe_sec_cm_rstmgr_intersig_mubi
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_sw_reset_vseq
+      run_opts: ["+test_timeout_ns=11520000"]
+      reseed: 50
+    }
+    // The register entries below carry `+en_scb=0` and the register coverage build, because a
+    // workload that writes random values everywhere leaves nothing for a functional model to
+    // predict. They set the options directly rather than through `csr_tests_mode`, which would put
+    // the legacy common sequence back in place of the reset-safe one. `intr_test` keeps the
+    // scoreboard. The common sequences, run against the reset-safe base test. The wrapper picks
+    // which to run from the same plusarg the legacy entries use, and `pwrmgr_rst_safe_common_vseq`
+    // enables reset testing. `tl_errors`, `tl_intg_err`, `sec_cm_fi` and `shadow_reg_errors` have
+    // no entry because they are commented out of the reset-safe wrapper.
+    {
+      name: pwrmgr_rst_safe_csr_hw_reset
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      build_mode: "cover_reg_top"
+      run_opts: ["+csr_hw_reset", "+en_scb=0", "+test_timeout_ns=17280000"]
+      reseed: 5
     }
     {
-      name: pwrmgr_lowpower_wakeup_race
-      uvm_test_seq: pwrmgr_lowpower_wakeup_race_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
+      name: pwrmgr_rst_safe_csr_rw
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      build_mode: "cover_reg_top"
+      run_opts: ["+csr_rw", "+en_scb=0", "+test_timeout_ns=17280000"]
+      reseed: 20
     }
     {
-      name: pwrmgr_wakeup
-      uvm_test_seq: pwrmgr_wakeup_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
+      name: pwrmgr_rst_safe_csr_bit_bash
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      build_mode: "cover_reg_top"
+      run_opts: ["+csr_bit_bash", "+en_scb=0", "+test_timeout_ns=17280000"]
+      reseed: 5
     }
     {
-      name: pwrmgr_wakeup_reset
-      uvm_test_seq: pwrmgr_wakeup_reset_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
+      name: pwrmgr_rst_safe_csr_aliasing
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      build_mode: "cover_reg_top"
+      run_opts: ["+csr_aliasing", "+en_scb=0", "+test_timeout_ns=17280000"]
+      reseed: 5
     }
     {
-      name: pwrmgr_aborted_low_power
-      uvm_test_seq: pwrmgr_aborted_low_power_vseq
+      name: pwrmgr_rst_safe_intr_test
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      run_opts: ["+run_intr_test", "+test_timeout_ns=17280000"]
+      reseed: 50
     }
     {
-      name: pwrmgr_sec_cm_lc_ctrl_intersig_mubi
-      uvm_test_seq: pwrmgr_repeat_wakeup_reset_vseq
-      run_opts: ["+test_timeout_ns=8640000", "+pwrmgr_mubi_mode=PwrmgrMubiLcCtrl"]
+      name: pwrmgr_rst_safe_same_csr_outstanding
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_common_vseq
+      build_mode: "cover_reg_top"
+      run_opts: ["+run_same_csr_outstanding", "+en_scb=0", "+test_timeout_ns=17280000"]
+      reseed: 20
+    }
+    // Declared by the imported reset-safe stress list; only the seed count is set here, and it is
+    // the count the legacy stress tests of the same names carry, so a weekly run of one compares
+    // with a weekly run of the other.
+    {
+      name: pwrmgr_rst_safe_stress_all
+      reseed: 50
     }
     {
-      name: pwrmgr_sec_cm_rstmgr_intersig_mubi
-      uvm_test_seq: pwrmgr_sw_reset_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
-      name: pwrmgr_esc_clk_rst_malfunc
-      uvm_test_seq: pwrmgr_esc_clk_rst_malfunc_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
-      name: pwrmgr_sec_cm_ctrl_config_regwen
-      uvm_test_seq: pwrmgr_sec_cm_ctrl_config_regwen_vseq
-      run_opts: ["+test_timeout_ns=144000000"]
-    }
-    {
-      name: pwrmgr_global_esc
-      uvm_test_seq: pwrmgr_global_esc_vseq
-      run_opts: ["+test_timeout_ns=2880000000"]
-    }
-    {
-      name: pwrmgr_escalation_timeout
-      uvm_test_seq: pwrmgr_escalation_timeout_vseq
-    }
-    {
-      name: pwrmgr_glitch
-      uvm_test_seq: pwrmgr_glitch_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
-      name: pwrmgr_disable_rom_integrity_check
-      uvm_test_seq: pwrmgr_disable_rom_integrity_check_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
-      name: pwrmgr_reset_invalid
-      uvm_test_seq: pwrmgr_reset_invalid_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
-    }
-    {
-      name: pwrmgr_lowpower_invalid
-      uvm_test_seq: pwrmgr_lowpower_invalid_vseq
-      run_opts: ["+test_timeout_ns=2880000"]
+      name: pwrmgr_rst_safe_stress_all_with_rand_reset
+      reseed: 50
     }
   ]
 
@@ -169,11 +284,36 @@
   regressions: [
     {
       name: smoke
-      tests: ["pwrmgr_smoke"]
+      tests: ["pwrmgr_rst_safe_smoke"]
     }
     {
       name: rst_safe
-      tests: ["pwrmgr_rst_safe_smoke", "pwrmgr_rst_safe_smoke_with_rand_reset"]
+      tests: ["pwrmgr_rst_safe_smoke", "pwrmgr_rst_safe_wakeup", "pwrmgr_rst_safe_sw_reset",
+              "pwrmgr_rst_safe_smoke_with_rand_reset",
+              "pwrmgr_rst_safe_aborted_low_power", "pwrmgr_rst_safe_reset",
+              "pwrmgr_rst_safe_glitch", "pwrmgr_rst_safe_global_esc",
+              "pwrmgr_rst_safe_escalation_timeout", "pwrmgr_rst_safe_esc_clk_rst_malfunc",
+              "pwrmgr_rst_safe_sec_cm_ctrl_config_regwen", "pwrmgr_rst_safe_lowpower_invalid",
+              "pwrmgr_rst_safe_reset_invalid", "pwrmgr_rst_safe_lowpower_wakeup_race",
+              "pwrmgr_rst_safe_repeat_wakeup_reset",
+              "pwrmgr_rst_safe_disable_rom_integrity_check",
+              "pwrmgr_rst_safe_sec_cm_lc_ctrl_intersig_mubi",
+              "pwrmgr_rst_safe_sec_cm_rstmgr_intersig_mubi",
+              "pwrmgr_rst_safe_csr_hw_reset", "pwrmgr_rst_safe_csr_rw",
+              "pwrmgr_rst_safe_csr_bit_bash", "pwrmgr_rst_safe_csr_aliasing",
+              "pwrmgr_rst_safe_same_csr_outstanding", "pwrmgr_rst_safe_intr_test",
+              "pwrmgr_rst_safe_stress_all", "pwrmgr_rst_safe_stress_all_with_rand_reset"]
+    }
+    {
+      name: wp3
+      tests: [
+        "pwrmgr_rst_safe_reset",
+        "pwrmgr_rst_safe_reset_invalid",
+        "pwrmgr_rst_safe_disable_rom_integrity_check",
+        "pwrmgr_rst_safe_stress_all",
+        "pwrmgr_rst_safe_sec_cm_lc_ctrl_intersig_mubi",
+        "pwrmgr_rst_safe_stress_all_with_rand_reset"
+      ]
     }
   ]
 }

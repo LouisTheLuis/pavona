@@ -6,7 +6,7 @@
   import_testplans: ["hw/dv/tools/dvsim/testplans/csr_testplan.hjson",
                      "hw/dv/tools/dvsim/testplans/intr_test_testplan.hjson",
                      "hw/dv/tools/dvsim/testplans/tl_device_access_types_testplan.hjson",
-                     "hw/dv/tools/dvsim/testplans/stress_all_with_reset_testplan.hjson",
+                     "hw/dv/tools/dvsim/testplans/rst_safe_stress_testplan.hjson",
                      "hw/dv/tools/dvsim/testplans/sec_cm_count_testplan.hjson",
                      "hw/dv/tools/dvsim/testplans/sec_cm_fsm_testplan.hjson",
                      "pwrmgr_sec_cm_testplan.hjson"]
@@ -39,7 +39,7 @@
             - The output `pwr_rst_req.rstreqs` matches the enabled resets.
             '''
       stage: V1
-      tests: ["pwrmgr_smoke"]
+      tests: ["pwrmgr_rst_safe_smoke"]
       features: [
         "PWRMGR.LOW_POWER.ENTRY",
         "PWRMGR.LOW_POWER.WAKEUP",
@@ -80,7 +80,7 @@
             - Coverage collected by `wakeup_cg` and `wakeup_intr_cg`.
             '''
       stage: V2
-      tests: ["pwrmgr_wakeup"]
+      tests: ["pwrmgr_rst_safe_wakeup"]
       features: [
         "PWRMGR.LOW_POWER.WAKEUP",
         "PWRMGR.LOW_POWER.WAKE_INFO",
@@ -110,7 +110,7 @@
 % endif
             '''
       stage: V2
-      tests: ["pwrmgr_wakeup"]
+      tests: ["pwrmgr_rst_safe_wakeup"]
       features: [
         "PWRMGR.CLOCK_CONTROL.IO_IN_LOW_POWER",
         "PWRMGR.CLOCK_CONTROL.MAIN_IN_LOW_POWER",
@@ -150,7 +150,7 @@
               `abort` events when capture is enabled.
             '''
       stage: V2
-      tests: ["pwrmgr_aborted_low_power", "pwrmgr_lowpower_invalid"]
+      tests: ["pwrmgr_rst_safe_aborted_low_power", "pwrmgr_rst_safe_lowpower_invalid"]
       features: [
         "PWRMGR.LOW_POWER.ENTRY",
         "PWRMGR.LOW_POWER.WAKE_INFO",
@@ -183,7 +183,7 @@
              conditional resets inputs.
             '''
       stage: V2
-      tests: ["pwrmgr_reset", "pwrmgr_reset_invalid"]
+      tests: ["pwrmgr_rst_safe_reset", "pwrmgr_rst_safe_reset_invalid"]
       features: [
         "PWRMGR.RESET.REQUEST",
         "PWRMGR.RESET.MAIN_POWER_GLITCH_RESET",
@@ -209,7 +209,7 @@
             - Checks the output `pwr_rst_req.rstreqs` matches power glitch.
             '''
       stage: V2
-      tests: ["pwrmgr_reset"]
+      tests: ["pwrmgr_rst_safe_reset"]
       features: ["PWRMGR.RESET.MAIN_POWER_GLITCH_RESET"]
     }
     {
@@ -232,7 +232,7 @@
               making sure they happen per the triggering order.
               '''
       stage: V2
-      tests: ["pwrmgr_wakeup_reset"]
+      tests: ["pwrmgr_rst_safe_repeat_wakeup_reset"]
       features: [
         "PWRMGR.LOW_POWER.WAKEUP",
         "PWRMGR.RESET.REQUEST",
@@ -259,7 +259,7 @@
             - Either pwrmgr remains active or a full low power cycle occurs.
             '''
       stage: V2
-      tests: ["pwrmgr_lowpower_wakeup_race"]
+      tests: ["pwrmgr_rst_safe_lowpower_wakeup_race"]
       features: [
         "PWRMGR.LOW_POWER.ENTRY",
         "PWRMGR.LOW_POWER.WAKEUP",
@@ -284,7 +284,7 @@
             Try these steps with different lc_ctrl inputs.
             '''
       stage: V2
-      tests: ["pwrmgr_disable_rom_integrity_check"]
+      tests: ["pwrmgr_rst_safe_disable_rom_integrity_check"]
       features: ["PWRMGR.RESET.CHECK_ROM_INTEGRITY"]
     }
     {
@@ -304,23 +304,17 @@
               triggered.
             '''
       stage: V3
-      tests: ["pwrmgr_escalation_timeout"]
+      tests: ["pwrmgr_rst_safe_escalation_timeout"]
       features: ["PWRMGR.RESET.ESCALATION_TIMEOUT"]
     }
     {
-      name: stress_all
-      desc: '''This runs random sequences in succession.
-
-            Randomly chooses from the following sequences:
-            - pwrmgr_aborted_low_power_vseq
-            - pwrmgr_lowpower_wakeup_race_vseq
-            - pwrmgr_reset_vseq
-            - pwrmgr_smoke_vseq
-            - pwrmgr_wakeup_reset_vseq
-            - pwrmgr_wakeup_vseq
+      name: random_reset
+      desc: '''
+            Run the reset-safe smoke sequence while the delay agent injects resets at
+            randomized points, so every smoke step is exercised across a reset boundary.
             '''
       stage: V2
-      tests: ["pwrmgr_stress_all"]
+      tests: ["pwrmgr_rst_safe_smoke_with_rand_reset"]
       features: []
     }
   ]

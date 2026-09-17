@@ -5,12 +5,9 @@
 // Test shape: how many reset epochs, how many operations in each, and when reset lands.
 class pwrmgr_rst_safe_test_seq_parameters extends dv_test_seq_parameters;
 
-  // Slow clock cycles between the epoch starting and reset being applied. The delay agent runs
-  // this on the power-on reset domain, which is the slow clock, so the numbers here are slow
-  // cycles and not bus cycles.
-  //
-  // The range is derived from how long one operation takes on this top, which the package works
-  // out from the clock frequencies the top is built with.
+  // Slow clock cycles between the epoch starting and reset being applied. The delay agent runs on
+  // the power-on reset domain, so these are slow cycles. The range comes from how long one
+  // operation takes on this top.
   rand int unsigned reset_delay_steps;
 
   `uvm_object_utils(pwrmgr_rst_safe_test_seq_parameters)
@@ -24,10 +21,9 @@ class pwrmgr_rst_safe_test_seq_parameters extends dv_test_seq_parameters;
 
   constraint num_trans_c {num_trans inside {[1 : 3]};}
 
-  // Reset has to land while the operation is still going. The upper bound is three quarters of
-  // how long one takes on this top, so it stays inside whatever the operation count randomizes
-  // to; a delay that outlives the workload is not merely a weaker test, because the base sequence
-  // warns when the main thread finishes first and a warning fails the run.
+  // Reset has to land while the operation is still going, so the bound is three quarters of one
+  // operation. A delay that outlives the workload makes the base sequence warn, which fails the
+  // run.
   constraint reset_delay_steps_c {
     reset_delay_steps inside {[2 : (LowPowerOpAonCycles * 3) / 4]};
   }
@@ -58,10 +54,8 @@ class pwrmgr_rst_safe_config_parameters extends dv_config_parameters;
   // that the recorded reasons accumulate across rounds.
   rand bit keep_prior_wake_info;
 
-  // What rstmgr forwards from software, as raw bits rather than the enumeration. Only one
-  // encoding requests a reset and the rest have to leave the device alone, so the values that
-  // are not members of the enumeration are exactly what this test needs to reach, and a
-  // randomized enumeration would never produce them.
+  // What rstmgr forwards from software, as raw bits. Only one encoding requests a reset, so the
+  // values outside the enumeration are what this needs to reach.
   rand bit [MUBI4W-1:0] sw_rst_req_raw;
 
   // How far apart to place low power entry and the wakeup, in cycles of their own clocks. The
@@ -85,12 +79,9 @@ class pwrmgr_rst_safe_config_parameters extends dv_config_parameters;
   rand resets_t resets;
   rand resets_t resets_en;
 
-  // A dip on the main power supply, and how long it lasts. The device treats a long enough dip
-  // as a reset in its own right.
+  // A dip on the main power supply and how long it lasts; a long enough dip is a reset in itself.
   // Which way the escalation side is broken: its clock taken away, or its reset held.
-  // The lifecycle broadcast, as raw bits so the encodings that are not members of the
-  // enumeration are reachable. Those are what the corruption test exists to send: the device
-  // has to treat anything that is not a clean On as not enabled.
+  // The lifecycle broadcast, as raw bits so the encodings outside the enumeration are reachable.
   rand bit [lc_ctrl_pkg::TxWidth-1:0] lc_hw_debug_en;
   rand bit [lc_ctrl_pkg::TxWidth-1:0] lc_dft_en;
 
@@ -159,9 +150,8 @@ endclass : pwrmgr_rst_safe_config_parameters
 
 // Reset-safe functional base for the power manager.
 //
-// Everything this sequence waits on is a transaction. The device announces when the processor
-// may run and when it has entered low power, and those announcements are what the flow below
-// is built on, so no part of it samples a pin or counts cycles to decide what happened.
+// Everything this sequence waits on is a transaction. The device announces when the processor may
+// run and when it has entered low power, so nothing here samples a pin or counts cycles.
 class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
     .RAL_T              (pwrmgr_reg_block),
     .CFG_T              (pwrmgr_env_cfg),
@@ -256,30 +246,20 @@ task pwrmgr_rand_rst_safe_base_vseq::main_thread();
 endtask : main_thread
 
 
-// The framework clears every interrupt register when the sequence ends, and it does that on the
-// bus outside main_thread(), where the reset-safe base has no way to terminate it as a unit. Its
-// own guard against this is `cfg.under_reset`, which nothing sets on the reset-safe path, so a
-// reset landing during it runs straight through rather than standing down.
-//
-// Each sequence clears what it set instead, and anything added later has to do the same.
+// The framework clears every interrupt register when the sequence ends, on the bus outside
+// main_thread(), and its guard `cfg.under_reset` is never set on the reset-safe path. Each sequence
+// clears what it set instead.
 task pwrmgr_rand_rst_safe_base_vseq::post_start();
   do_clear_all_interrupts = 1'b0;
   super.post_start();
 endtask : post_start
 
 
-// Nothing. Every sequence establishes what it needs for itself, which is what the other ported
-// blocks do. Waiting here would be wrong twice over: the framework calls this after reset has
-// been released rather than while it is held, and it calls it again after a test that raised a
-// fatal alert, where the device is already up and there is nothing to wait for. A sequence that
-// needs the bus waits for the device to report that the processor may run, at the point it needs
-// it.
+// Nothing. Every sequence establishes what it needs for itself: this runs after reset is released,
+// and again after a fatal alert test where the device is already up.
 task pwrmgr_rand_rst_safe_base_vseq::dut_init();
-  // Nothing. Every sequence establishes what it needs for itself: the stress wrapper turns this
-  // off and runs sequences one after another inside a single reset epoch, so a sequence that
-  // relied on this having run would be relying on something that did not happen. The framework
-  // also calls it after a test that raised a fatal alert, where the device is already up and
-  // there is nothing to wait for.
+  // Nothing. The stress wrapper turns this off and runs sequences inside one reset epoch, so
+  // anything relying on it would be relying on something that did not happen.
 endtask : dut_init
 
 
@@ -311,11 +291,9 @@ task pwrmgr_rand_rst_safe_base_vseq::wait_for_device_active();
   string             last = "nothing";
   int unsigned       queued;
 
-  // What is already queued is reported before the wait, and what was consumed after it. A timeout
-  // on an announcement has two causes that look the same from the message alone: the change never
-  // happened, or it happened before this wait began and was taken by something else. Nothing queued
-  // and nothing consumed is the first; announcements consumed that all carried the wrong value is
-  // the second.
+  // What is queued is reported before the wait and what was consumed after it. A timeout means
+  // either the change never happened or it happened before the wait began: nothing queued and
+  // nothing consumed is the first, announcements that all carried the wrong value the second.
   queued = p_sequencer.active_fifo.used();
   `uvm_info(`gfn, $sformatf(
             "Waiting for the device to report the processor may run, %0d already queued",
@@ -334,12 +312,9 @@ task pwrmgr_rand_rst_safe_base_vseq::wait_for_device_active();
 endtask : wait_for_device_active
 
 
-// The gate a sequence opens with, which is not the same question as the one above. The device
-// announces the processor being let to run when that changes, so waiting for it works from a reset
-// and does not work from anywhere else. A sequence started by the stress wrapper begins on a device
-// that has been running since whichever sequence ran before it, and the announcement it would wait
-// for went by long before it existed. The wrapper takes that wait once, for the reset epoch it
-// owns, so there is nothing left here to wait for.
+// The gate a sequence opens with. The device announces the processor being let to run only when it
+// changes, so this works from a reset and not from the stress wrapper, where the device has been
+// running since the previous sequence. The wrapper takes that wait once for the epoch it owns.
 task pwrmgr_rand_rst_safe_base_vseq::wait_for_device_active_at_start();
   if (reset_ctrl_higher_seq) return;
   wait_for_device_active();
@@ -456,15 +431,11 @@ task pwrmgr_rand_rst_safe_base_vseq::set_nvm_idle(bit flash, bit otp, bit lc);
 endtask : set_nvm_idle
 
 
-// The device stops the processor fetching as soon as it starts a low power transition, several
-// states before it decides whether to complete it. That announcement is what a test waits on to
-// place an input inside the window, rather than reaching into the state it cannot see.
-// Answer for one rom and leave the rest reporting a finished, trustworthy check. The device waits
-// for every rom to report done before it reaches its active state, and treats a rom that is not
-// good as a reason not to run, so naming one of them is how a test puts the check under pressure
-// without stalling on the others. From here the driver owns the answer for the rest of the reset
-// epoch: its own model of the check stands down, because a reply arriving later would overwrite
-// what was asked for.
+// The device stops the processor fetching as soon as a low power transition starts, several states
+// before it decides whether to complete it, which is what a test waits on to place an input inside
+// the window. Answer for one rom and leave the rest reporting a finished, trustworthy check, so the
+// check is put under pressure without stalling on the others. From here the driver owns the answer
+// for the rest of the reset epoch.
 task pwrmgr_rand_rst_safe_base_vseq::set_rom_response(int unsigned index, mubi4_t done,
                                                       mubi4_t good);
   pwrmgr_fast_seq rom_response_seq;
@@ -520,12 +491,10 @@ task pwrmgr_rand_rst_safe_base_vseq::set_wakeups(wakeups_t wakeups);
 endtask : set_wakeups
 
 
-// Configuration written over the bus does not reach the slow domain until the device has
-// synchronized it. This register reports when that has happened, so the transition is not
-// started before the slow state machine can see what it was told.
-// Software asks rstmgr for a reset, and rstmgr forwards the request here. Only the true
-// encoding is a request; every other value has to leave the device alone, which is what makes
-// the negative cases worth driving.
+// Configuration written over the bus reaches the slow domain only once the device has synchronized
+// it, and this register reports when that happened. Software asks rstmgr for a reset and rstmgr
+// forwards it here. Only the true encoding is a request, which is what makes the other values worth
+// driving.
 task pwrmgr_rand_rst_safe_base_vseq::set_processor_sleeping_after(bit sleeping,
                                                                   int unsigned delay_cycles);
   pwrmgr_fast_seq fast_seq;
@@ -605,22 +574,20 @@ task pwrmgr_rand_rst_safe_base_vseq::interrupt_escalation_clock_for(int unsigned
 
   esc_clk_interrupt_seq = pwrmgr_aon_seq::type_id::create("esc_clk_interrupt_seq");
   esc_clk_interrupt_seq.item = pwrmgr_aon_item::type_id::create("req");
-  `DV_CHECK_RANDOMIZE_WITH_FATAL(esc_clk_interrupt_seq.item, change_escalation == 1'b1;
-                                                             escalation_reset == cur_escalation_reset;
-                                                             esc_rst_asserted == cur_esc_rst_asserted;
-                                                             esc_clk_stopped == 1'b1;
-                                                             esc_clk_stopped_cycles == cycles;)
+  `DV_CHECK_RANDOMIZE_WITH_FATAL(esc_clk_interrupt_seq.item,
+                                 change_escalation == 1'b1;
+                                 escalation_reset == cur_escalation_reset;
+                                 esc_rst_asserted == cur_esc_rst_asserted;
+                                 esc_clk_stopped == 1'b1;
+                                 esc_clk_stopped_cycles == cycles;)
   esc_clk_interrupt_seq.start(p_sequencer.aon_sequencer_h, this);
 endtask : interrupt_escalation_clock_for
 
 
 
 
-// A device held in its invalid state cannot forward a reset request, which is what two of the
-// checks on the reset request interface require of a working device. They are suspended for as
-// long as a test holds the device there and put back once it is running again. Only those two
-// are affected; the escalation and software reset checks on the same interface stay on, because
-// a wedged device is still expected to behave for those.
+// A device held in its invalid state cannot forward a reset request, so the two checks that require
+// it are suspended while a test holds it there. The escalation and software reset checks stay on.
 function void pwrmgr_rand_rst_safe_base_vseq::suspend_reset_forwarding_checks(bit suspend);
   cfg.pwrmgr_rstreqs_sva_vif.disable_hw_reset_sva = suspend;
 endfunction : suspend_reset_forwarding_checks
@@ -681,10 +648,8 @@ endtask : request_processor_wake_on_entry
 
 
 
-// What the lifecycle controller is broadcasting. Held until changed, because the device reads it
-// as a level whenever it needs to decide whether debug is allowed. The driver is what holds it,
-// so this item says only that the broadcast is moving and a later item about something else
-// leaves it where it is.
+// What the lifecycle controller is broadcasting, held until changed because the device reads it as
+// a level. The driver holds it, so a later item about something else leaves it alone.
 task pwrmgr_rand_rst_safe_base_vseq::set_lifecycle_broadcast(
     bit [lc_ctrl_pkg::TxWidth-1:0] hw_debug_en, bit [lc_ctrl_pkg::TxWidth-1:0] dft_en);
   pwrmgr_fast_seq lc_broadcast_seq;
