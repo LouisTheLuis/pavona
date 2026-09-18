@@ -2629,6 +2629,31 @@ pavona_test(
 )
 
 pavona_test(
+    name = "keymgr_dpe_sideload_aes_test",
+    srcs = ["keymgr_dpe_sideload_aes_test.c"],
+    exec_env = DRAGONFLY_TEST_ENVS,
+    verilator = verilator_params(timeout = "long"),
+    deps = [
+        "//hw/top:aes_c_regs",
+        "//hw/top:keymgr_dpe_c_regs",
+        "//hw/top:kmac_c_regs",
+        "//sw/device/lib/arch:boot_stage",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/dif:aes",
+        "//sw/device/lib/dif:keymgr_dpe",
+        "//sw/device/lib/dif:kmac",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/runtime:print",
+        "//sw/device/lib/testing:aes_testutils",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing:keymgr_dpe_testutils",
+        "//sw/device/lib/testing:kmac_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+pavona_test(
     name = "keymgr_sideload_kmac_test",
     srcs = ["keymgr_sideload_kmac_test.c"],
     exec_env = dicts.add(
