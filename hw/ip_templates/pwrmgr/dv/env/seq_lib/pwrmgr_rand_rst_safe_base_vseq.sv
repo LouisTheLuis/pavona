@@ -171,7 +171,7 @@ endclass : pwrmgr_rst_safe_config_parameters
 class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
     .RAL_T              (pwrmgr_reg_block),
     .CFG_T              (pwrmgr_env_cfg),
-    .COV_T              (pwrmgr_env_cov),
+    .COV_T              (pwrmgr_rst_safe_env_cov),
     .VIRTUAL_SEQUENCER_T(pwrmgr_rst_safe_virtual_sequencer),
     .TEST_PARAMS_T      (pwrmgr_rst_safe_test_seq_parameters),
     .CONFIG_PARAMS_T    (pwrmgr_rst_safe_config_parameters)

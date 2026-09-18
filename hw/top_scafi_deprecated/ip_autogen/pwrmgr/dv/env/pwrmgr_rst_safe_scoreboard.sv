@@ -138,6 +138,9 @@ class pwrmgr_rst_safe_scoreboard extends cip_rst_safe_scoreboard #(
   extern protected function void note_volatile_value(string name, bit [TL_DW-1:0] value);
   extern protected function void check_volatile_read(string name, bit [TL_DW-1:0] value);
   extern protected function void note_fault_status();
+  extern protected function void sample_reset_coverage(bit sleep);
+  extern protected function void sample_control_coverage(bit sleep);
+  extern protected function void sample_rom_blocker_coverage();
   extern virtual function void on_alert(string alert_name, alert_esc_seq_item item);
 endclass : pwrmgr_rst_safe_scoreboard
 
@@ -269,6 +272,8 @@ task pwrmgr_rst_safe_scoreboard::process_aon_events();
         // interrupt for it.
         if (cur_reset_req) exp_intr_wakeup = 1'b0;
         evaluate_wake_cause();
+        // The device is awake here: a reset request is what brought this announcement.
+        sample_reset_coverage(.sleep(1'b0));
       end
       default: ;
     endcase
@@ -326,6 +331,13 @@ endtask : process_fast_events
 // was recorded about the wake is separate and accumulates.
 function void pwrmgr_rst_safe_scoreboard::handle_wakeup(pwrmgr_wakeup_item item);
   cur_wakeups = item.wakeups;
+
+  if (cfg.en_cov) begin
+    foreach (cov.wakeup_ctrl_cg_wrap[i]) begin
+      cov.wakeup_ctrl_cg_wrap[i].sample(synced_wakeup_en[i], !`gmv(ral.wake_info_capture_dis),
+                                        cur_wakeups[i]);
+    end
+  end
   evaluate_wake_cause();
 endfunction : handle_wakeup
 
@@ -338,6 +350,12 @@ function void pwrmgr_rst_safe_scoreboard::handle_low_power(pwrmgr_flag_item item
 
   in_low_power = item.value;
   evaluate_wake_cause();
+
+  // The other half of the same groups, taken where the device says it is asleep. A reset request
+  // standing here would be the device contradicting itself rather than a case worth recording,
+  // and the groups declare that pairing illegal, so the sample is left to the awake path.
+  if (item.value && !cur_reset_req) sample_reset_coverage(.sleep(1'b1));
+  if (item.value) sample_control_coverage(.sleep(1'b1));
 endfunction : handle_low_power
 
 
@@ -360,6 +378,51 @@ endfunction : handle_interrupt
 // The cause is decided from levels, not edges: a source already asserted before the device went
 // down counts and announces no change, so this is evaluated at every event that can move either
 // term. A reset request outranks a wake.
+function void pwrmgr_rst_safe_scoreboard::sample_control_coverage(bit sleep);
+  control_enables_t enables;
+
+  if (!cfg.en_cov) return;
+
+  enables.main_clk_en = bit'(`gmv(ral.control.core_clk_en));
+  enables.io_clk_en = bit'(`gmv(ral.control.io_clk_en));
+  enables.usb_clk_en_lp     = bit'(`gmv(ral.control.usb_clk_en_lp));
+  enables.usb_clk_en_active = bit'(`gmv(ral.control.usb_clk_en_active));
+  enables.main_pd_n = bit'(`gmv(ral.control.main_pd_n));
+
+  cov.control_cg.sample(enables, sleep);
+endfunction : sample_control_coverage
+
+
+// The rom and lifecycle inputs that hold the device short of active. These are driven and held by
+// the testbench rather than produced by the device, so taking them at a device announcement is a
+// read of settled stimulus rather than a race against an output.
+function void pwrmgr_rst_safe_scoreboard::sample_rom_blocker_coverage();
+  if (!cfg.en_cov) return;
+
+  cov.rom_active_blockers_cg.sample(
+      cfg.pwrmgr_vif.rom_ctrl_i[0].done,
+      cfg.pwrmgr_vif.rom_ctrl_i[0].good,
+      cfg.pwrmgr_vif.lc_dft_en,
+      cfg.pwrmgr_vif.lc_hw_debug_en);
+endfunction : sample_rom_blocker_coverage
+
+
+// Takes every reset group at one moment, so the bins describe one consistent view of the device
+// rather than several taken at different times.
+function void pwrmgr_rst_safe_scoreboard::sample_reset_coverage(bit sleep);
+  resets_t resets_en;
+
+  if (!cfg.en_cov) return;
+
+  resets_en = resets_t'(`gmv(ral.reset_en));
+  cov.hw_reset_0_cg.sample(last_reset_req.rstreqs[0], resets_en[0], sleep);
+  cov.hw_reset_1_cg.sample(last_reset_req.rstreqs[1], resets_en[1], sleep);
+  cov.rstmgr_sw_reset_cg.sample(cur_sw_rst_req);
+  cov.main_power_reset_cg.sample(saw_main_power_up ? 1'b0 : 1'b1, sleep);
+  cov.esc_reset_cg.sample(cur_escalation, sleep);
+endfunction : sample_reset_coverage
+
+
 function void pwrmgr_rst_safe_scoreboard::evaluate_wake_cause();
   wakeups_t enabled = cur_wakeups & synced_wakeup_en;
 
@@ -374,6 +437,14 @@ function void pwrmgr_rst_safe_scoreboard::evaluate_wake_cause();
   note_volatile_value("wake_info_reasons", exp_wake_info_reasons);
 
   if (in_low_power && enabled != '0 && !cur_reset_req) exp_intr_wakeup = 1'b1;
+
+  if (cfg.en_cov) begin
+    bit enable = bit'(`gmv(ral.intr_enable.wakeup));
+    foreach (cov.wakeup_intr_cg_wrap[i]) begin
+      cov.wakeup_intr_cg_wrap[i].sample(enable, exp_intr_wakeup, exp_wake_status[i],
+                                        exp_intr_wakeup && enable);
+    end
+  end
 endfunction : evaluate_wake_cause
 
 
@@ -482,15 +553,13 @@ endfunction : stim_as_seen
 
 
 function void pwrmgr_rst_safe_scoreboard::handle_fsm_state(pwrmgr_fsm_item item);
-  // The device abandons a transition at one of two states, and which it reaches first decides what
-  // it reports. The processor is asked about first.
-  //
-  // Both are predicted from what the device could see: the processor sleeping and two of the three
-  // idle inputs arrive through two flops, so the deciding value is the one from two cycles before
-  // the state was announced. The lifecycle idle is wired straight through.
-  //
   // The fall through also needs the hint, and has to be evaluated before the device clears it in
   // this same state.
+  if (item.state inside {pwrmgr_pkg::FastPwrStateRomCheckDone,
+                         pwrmgr_pkg::FastPwrStateRomCheckGood}) begin
+    sample_rom_blocker_coverage();
+  end
+
   if (item.state == pwrmgr_pkg::FastPwrStateFallThrough) begin
     pwrmgr_stim_seen_t late  = stim_as_seen(cycles_before(item.clk_count, SyncFlops));
     pwrmgr_stim_seen_t early = stim_as_seen(cycles_before(item.clk_count,
@@ -618,6 +687,8 @@ task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels
   // either: a drifted mirror would judge every later read against a value software never wrote.
   if (addr_phase_write && csr.get_name() == "control" && !exp_ctrl_locked) begin
     exp_low_power_hint = bit'(get_field_val(ral.control.low_power_hint, item.a_data));
+  // The processor is running to have issued this write.
+  sample_control_coverage(.sleep(1'b0));
   end
 
   if (addr_phase_write && !(csr.get_name() == "control" && exp_ctrl_locked)) begin

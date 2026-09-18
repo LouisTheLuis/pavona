@@ -34,6 +34,7 @@ filesets:
       - pwrmgr_virtual_sequencer.sv: {is_include_file: true}
       - pwrmgr_scoreboard.sv: {is_include_file: true}
       - pwrmgr_env.sv: {is_include_file: true}
+      - pwrmgr_rst_safe_env_cov.sv: {is_include_file: true}
       - pwrmgr_rst_safe_virtual_sequencer.sv: {is_include_file: true}
       - pwrmgr_rst_safe_scoreboard.sv: {is_include_file: true}
       - pwrmgr_rst_safe_env.sv: {is_include_file: true}

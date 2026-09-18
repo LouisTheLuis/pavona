@@ -71,6 +71,131 @@ class pwrmgr_wakeup_intr_cg_wrap;
   endfunction
 endclass
 
+// The covergroups below are declared here rather than inside a coverage class so that both the
+// normal and the reset-safe class can hold an instance of the ones it owns. Each class constructs
+// only its own, and a run builds one class, so a group is never scored by an environment that does
+// not sample it. option.name keeps the reported name the one the testplan refers to.
+
+// This collects coverage on the clock and power control functionality.
+covergroup pwrmgr_control_cg with function sample (control_enables_t control_enables, bit sleep);
+  option.name = "control_cg";
+
+% for clk in src_clks:
+  % if clk == 'usb':
+  usb_lp_cp: coverpoint control_enables.usb_clk_en_lp;
+  usb_active_cp: coverpoint control_enables.usb_clk_en_active;
+  % else:
+  ${clk}_cp: coverpoint control_enables.${clk}_clk_en;
+  % endif
+% endfor
+  main_pd_n_cp: coverpoint control_enables.main_pd_n;
+  sleep_cp: coverpoint sleep;
+
+  control_cross: cross
+% for clk in src_clks:
+  % if clk == 'usb':
+    usb_lp_cp, usb_active_cp,
+  % else:
+    ${clk}_cp,
+  % endif
+% endfor
+    main_pd_n_cp, sleep_cp;
+endgroup
+
+covergroup pwrmgr_hw_reset_0_cg with function sample (logic reset, logic enable, bit sleep);
+  option.name = "hw_reset_0_cg";
+
+  reset_cp: coverpoint reset;
+  enable_cp: coverpoint enable;
+  sleep_cp: coverpoint sleep;
+  reset_cross: cross reset_cp, enable_cp, sleep_cp {
+    // Reset and sleep are mutually exclusive.
+    illegal_bins illegal = reset_cross with (reset_cp && sleep_cp);
+  }
+endgroup
+
+covergroup pwrmgr_hw_reset_1_cg with function sample (logic reset, logic enable, bit sleep);
+  option.name = "hw_reset_1_cg";
+
+  reset_cp: coverpoint reset;
+  enable_cp: coverpoint enable;
+  sleep_cp: coverpoint sleep;
+  reset_cross: cross reset_cp, enable_cp, sleep_cp {
+    // Reset and sleep are mutually exclusive.
+    illegal_bins illegal = reset_cross with (reset_cp && sleep_cp);
+  }
+endgroup
+
+// This reset cannot be generated in low power state since it is triggered by software.
+covergroup pwrmgr_rstmgr_sw_reset_cg with function sample (logic sw_reset);
+  option.name = "rstmgr_sw_reset_cg";
+
+  sw_reset_cp: coverpoint sw_reset;
+endgroup
+
+covergroup pwrmgr_main_power_reset_cg with function sample (logic main_power_reset, bit sleep);
+  option.name = "main_power_reset_cg";
+
+  main_power_reset_cp: coverpoint main_power_reset;
+  sleep_cp: coverpoint sleep;
+  reset_cross: cross main_power_reset_cp, sleep_cp {
+    // Any reset and sleep are mutually exclusive.
+    illegal_bins illegal = reset_cross with (main_power_reset_cp && sleep_cp);
+  }
+endgroup
+
+covergroup pwrmgr_esc_reset_cg with function sample (logic esc_reset, bit sleep);
+  option.name = "esc_reset_cg";
+
+  esc_reset_cp: coverpoint esc_reset;
+  sleep_cp: coverpoint sleep;
+  reset_cross: cross esc_reset_cp, sleep_cp {
+    // Any reset and sleep are mutually exclusive.
+    illegal_bins illegal = reset_cross with (esc_reset_cp && sleep_cp);
+  }
+endgroup
+
+// This measures the number of cycles between the reset and wakeup.
+// It is positive when reset happened after wakeup, and zero when they coincided in time.
+covergroup pwrmgr_reset_wakeup_distance_cg with function sample (int cycles);
+  option.name = "reset_wakeup_distance_cg";
+
+  cycles_cp: coverpoint cycles {
+    bins close[] = {[-4 : 4]};
+    bins far = default;
+  }
+endgroup
+
+// This covers the rom inputs that should prevent entering the active state.
+covergroup pwrmgr_rom_active_blockers_cg with function sample (
+% for r in range(NumRomInputs):
+    logic [3:0] done_${r}, logic [3:0] good_${r},
+% endfor
+    logic [3:0] dft, logic [3:0] debug
+);
+  option.name = "rom_active_blockers_cg";
+
+% for r in range(NumRomInputs):
+  done_${r}_cp: coverpoint done_${r} {
+    `DV_MUBI4_CP_BINS
+  }
+  good_${r}_cp: coverpoint good_${r} {
+    `DV_MUBI4_CP_BINS
+  }
+% endfor
+  dft_cp: coverpoint dft {
+    `DV_LC_TX_T_CP_BINS
+  }
+  debug_cp: coverpoint debug {
+    `DV_LC_TX_T_CP_BINS
+  }
+  blockers_cross: cross
+% for r in range(NumRomInputs):
+    done_${r}_cp, good_${r}_cp,
+% endfor
+    dft_cp, debug_cp;
+endgroup
+
 class pwrmgr_env_cov extends cip_base_env_cov #(
   .CFG_T(pwrmgr_env_cfg)
 );
@@ -83,109 +208,14 @@ class pwrmgr_env_cov extends cip_base_env_cov #(
   pwrmgr_wakeup_ctrl_cg_wrap wakeup_ctrl_cg_wrap[pwrmgr_reg_pkg::NumWkups];
   pwrmgr_wakeup_intr_cg_wrap wakeup_intr_cg_wrap[pwrmgr_reg_pkg::NumWkups];
 
-  // This collects coverage on the clock and power control functionality.
-  covergroup control_cg with function sample (control_enables_t control_enables, bit sleep);
-% for clk in src_clks:
-  % if clk == 'usb':
-    usb_lp_cp: coverpoint control_enables.usb_clk_en_lp;
-    usb_active_cp: coverpoint control_enables.usb_clk_en_active;
-  % else:
-    ${clk}_cp: coverpoint control_enables.${clk}_clk_en;
-  % endif
-% endfor
-    main_pd_n_cp: coverpoint control_enables.main_pd_n;
-    sleep_cp: coverpoint sleep;
-
-    control_cross: cross
-% for clk in src_clks:
-  % if clk == 'usb':
-      usb_lp_cp, usb_active_cp,
-  % else:
-      ${clk}_cp,
-  % endif
-% endfor
-      main_pd_n_cp, sleep_cp;
-  endgroup
-
-  covergroup hw_reset_0_cg with function sample (logic reset, logic enable, bit sleep);
-    reset_cp: coverpoint reset;
-    enable_cp: coverpoint enable;
-    sleep_cp: coverpoint sleep;
-    reset_cross: cross reset_cp, enable_cp, sleep_cp {
-      // Reset and sleep are mutually exclusive.
-      illegal_bins illegal = reset_cross with (reset_cp && sleep_cp);
-    }
-  endgroup
-
-  covergroup hw_reset_1_cg with function sample (logic reset, logic enable, bit sleep);
-    reset_cp: coverpoint reset;
-    enable_cp: coverpoint enable;
-    sleep_cp: coverpoint sleep;
-    reset_cross: cross reset_cp, enable_cp, sleep_cp {
-      // Reset and sleep are mutually exclusive.
-      illegal_bins illegal = reset_cross with (reset_cp && sleep_cp);
-    }
-  endgroup
-
-  // This reset cannot be generated in low power state since it is triggered by software.
-  covergroup rstmgr_sw_reset_cg with function sample (logic sw_reset);
-    sw_reset_cp: coverpoint sw_reset;
-  endgroup
-
-  covergroup main_power_reset_cg with function sample (logic main_power_reset, bit sleep);
-    main_power_reset_cp: coverpoint main_power_reset;
-    sleep_cp: coverpoint sleep;
-    reset_cross: cross main_power_reset_cp, sleep_cp {
-      // Any reset and sleep are mutually exclusive.
-      illegal_bins illegal = reset_cross with (main_power_reset_cp && sleep_cp);
-    }
-  endgroup
-
-  covergroup esc_reset_cg with function sample (logic esc_reset, bit sleep);
-    esc_reset_cp: coverpoint esc_reset;
-    sleep_cp: coverpoint sleep;
-    reset_cross: cross esc_reset_cp, sleep_cp {
-      // Any reset and sleep are mutually exclusive.
-      illegal_bins illegal = reset_cross with (esc_reset_cp && sleep_cp);
-    }
-  endgroup
-
-  // This measures the number of cycles between the reset and wakeup.
-  // It is positive when reset happened after wakeup, and zero when they coincided in time.
-  covergroup reset_wakeup_distance_cg with function sample (int cycles);
-    cycles_cp: coverpoint cycles {
-      bins close[] = {[-4 : 4]};
-      bins far = default;
-    }
-  endgroup
-
-  // This covers the rom inputs that should prevent entering the active state.
-  covergroup rom_active_blockers_cg with function sample (
-% for r in range(NumRomInputs):
-      logic [3:0] done_${r}, logic [3:0] good_${r},
-% endfor
-      logic [3:0] dft, logic [3:0] debug
-  );
-% for r in range(NumRomInputs):
-    done_${r}_cp: coverpoint done_${r} {
-      `DV_MUBI4_CP_BINS
-    }
-    good_${r}_cp: coverpoint good_${r} {
-      `DV_MUBI4_CP_BINS
-    }
-% endfor
-    dft_cp: coverpoint dft {
-      `DV_LC_TX_T_CP_BINS
-    }
-    debug_cp: coverpoint debug {
-      `DV_LC_TX_T_CP_BINS
-    }
-    blockers_cross: cross
-% for r in range(NumRomInputs):
-      done_${r}_cp, good_${r}_cp,
-% endfor
-      dft_cp, debug_cp;
-  endgroup
+  pwrmgr_control_cg control_cg;
+  pwrmgr_hw_reset_0_cg hw_reset_0_cg;
+  pwrmgr_hw_reset_1_cg hw_reset_1_cg;
+  pwrmgr_rstmgr_sw_reset_cg rstmgr_sw_reset_cg;
+  pwrmgr_main_power_reset_cg main_power_reset_cg;
+  pwrmgr_esc_reset_cg esc_reset_cg;
+  pwrmgr_reset_wakeup_distance_cg reset_wakeup_distance_cg;
+  pwrmgr_rom_active_blockers_cg rom_active_blockers_cg;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
