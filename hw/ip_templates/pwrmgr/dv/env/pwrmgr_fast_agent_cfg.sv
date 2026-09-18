@@ -21,6 +21,12 @@ class pwrmgr_fast_agent_cfg extends dv_base_agent_cfg;
   // stimulus carried by an item and keeps the pin in a driver.
   virtual alert_esc_if esc_vif;
 
+  // Raised while the driver's main thread is running, and lowered at every reset. The framework
+  // kills and restarts that thread on each reset, so there is a window in which nothing is pulling
+  // from the sequencer. A sequence that starts an item in that window waits for a grant that
+  // cannot come, and the reset that ends the window kills the sequence while it waits.
+  bit driver_running;
+
   // Reports the registers the device writes itself, at the moment it commits them.
 
   // How long each peer takes to answer, in fast clock cycles. Randomized once when the

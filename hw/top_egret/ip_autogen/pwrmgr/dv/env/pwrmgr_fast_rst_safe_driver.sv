@@ -71,6 +71,7 @@ endclass : pwrmgr_fast_rst_safe_driver
 
 
 task pwrmgr_fast_rst_safe_driver::get_and_drive();
+  cfg.driver_running = 1'b1;
   fork
     answer_peer_requests();
     model_rom_check();
@@ -83,6 +84,7 @@ endtask : get_and_drive
 
 
 function void pwrmgr_fast_rst_safe_driver::reset_interface_and_driver();
+  cfg.driver_running = 1'b0;
   // At power on rstmgr is holding both resets, no clock has been reported, and neither otp nor
   // lifecycle has finished initializing.
   cfg.vif.pwr_rst_rsp <= '0;
@@ -241,16 +243,17 @@ endtask : manage_processor_wake_on_entry
 
 // Evaluated every cycle, like the thing it watches. If a test named a state and the machine is in
 // it, send it now; nothing waits and nothing is held.
+// Waits on the state value rather than on a clock edge. The state register is written by a
+// non-blocking assignment, which lands after the active items at that edge, so a process woken by
+// the edge would still read the state the machine held before it. Several states here last a
+// single cycle, so that read would name a state the machine has already left.
 task pwrmgr_fast_rst_safe_driver::manage_invalid_state_forcing();
   forever begin
-    @(posedge cfg.vif.clk);
-
-    if (force_invalid_requested && cfg.vif.fast_state == invalid_at_state) begin
-      force_invalid_requested = 1'b0;
-      `uvm_info(`gfn, $sformatf("Sending the state machine to invalid from %0s",
-                                invalid_at_state.name()), UVM_MEDIUM)
-      cfg.vif.force_invalid_state();
-    end
+    wait (force_invalid_requested && cfg.vif.fast_state == invalid_at_state);
+    force_invalid_requested = 1'b0;
+    `uvm_info(`gfn, $sformatf("Sending the state machine to invalid from %0s",
+                              invalid_at_state.name()), UVM_MEDIUM)
+    cfg.vif.force_invalid_state();
   end
 endtask : manage_invalid_state_forcing
 

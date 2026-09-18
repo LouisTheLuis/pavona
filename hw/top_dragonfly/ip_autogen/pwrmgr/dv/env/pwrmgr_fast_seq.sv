@@ -22,6 +22,9 @@ class pwrmgr_fast_seq extends dv_base_seq #(
 
   virtual task body();
     `DV_CHECK_FATAL(item != null, "Started without an item to carry")
+    // Nothing pulls from the sequencer between a reset assertion and the driver's restart, so an
+    // item started there waits for a grant that cannot come. Callers wait on driver_running first.
+    `DV_CHECK_FATAL(cfg.driver_running, "Started while the driver's main thread was not running")
     start_item(item);
     finish_item(item);
   endtask : body
