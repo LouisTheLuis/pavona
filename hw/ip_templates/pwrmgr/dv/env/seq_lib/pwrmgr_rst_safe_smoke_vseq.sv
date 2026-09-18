@@ -67,6 +67,7 @@ task pwrmgr_rst_safe_smoke_vseq::run_low_power_wakeup();
 
   // Ask for the transition. csr_wr rather than csr_update, because the write itself is what
   // arms the low power hint and it has to reach the device even when the mirror already agrees.
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(config_params.main_pd_n);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));

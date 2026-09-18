@@ -64,6 +64,22 @@ class pwrmgr_rst_safe_config_parameters extends dv_config_parameters;
   rand int unsigned cycles_before_transition;
   rand int unsigned cycles_before_early_wakeup;
 
+  // Which clocks software leaves running. The device is told these in the same register as the
+  // low power hint and acts on them when it takes the clocks away, so they belong to the same
+  // draw. Mostly left enabled, because a test about something else should not spend most of its
+  // seeds on a device running with its clocks off.
+  rand bit core_clk_en;
+  rand bit io_clk_en;
+  rand bit usb_clk_en_lp;
+  rand bit usb_clk_en_active;
+
+  constraint clock_enables_c {
+    core_clk_en       dist {1'b1 :/ 3, 1'b0 :/ 1};
+    io_clk_en         dist {1'b1 :/ 3, 1'b0 :/ 1};
+    usb_clk_en_lp     dist {1'b1 :/ 1, 1'b0 :/ 1};
+    usb_clk_en_active dist {1'b1 :/ 3, 1'b0 :/ 1};
+  }
+
   // Keep the main power domain up through the transition. Taking it down brings the glitch
   // path and the main power reset into a test whose purpose is the ordinary wakeup, so those
   // belong to their own sequences.
@@ -155,7 +171,7 @@ endclass : pwrmgr_rst_safe_config_parameters
 class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
     .RAL_T              (pwrmgr_reg_block),
     .CFG_T              (pwrmgr_env_cfg),
-    .COV_T              (pwrmgr_rst_safe_env_cov),
+    .COV_T              (pwrmgr_env_cov),
     .VIRTUAL_SEQUENCER_T(pwrmgr_rst_safe_virtual_sequencer),
     .TEST_PARAMS_T      (pwrmgr_rst_safe_test_seq_parameters),
     .CONFIG_PARAMS_T    (pwrmgr_rst_safe_config_parameters)
@@ -183,7 +199,9 @@ class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
   extern task set_processor_sleeping(bit sleeping);
   extern task set_wakeups(wakeups_t wakeups);
   extern task set_nvm_idle(bit flash, bit otp, bit lc);
+  extern function void stage_clock_enables();
   extern task set_rom_response(int unsigned index, mubi4_t done, mubi4_t good);
+  extern task set_all_rom_responses(mubi4_t done[], mubi4_t good[]);
   extern task wait_for_low_power_entry_started();
   extern task request_processor_wake_on_entry();
   extern task set_lifecycle_broadcast(bit [lc_ctrl_pkg::TxWidth-1:0] hw_debug_en,
@@ -191,9 +209,11 @@ class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
   extern task set_escalation_reset(bit asserted);
   extern task set_escalation_malfunction(bit clk_stopped, bit rst_asserted);
   extern task interrupt_escalation_clock_for(int unsigned cycles);
+  extern task wait_for_fast_driver_running();
   extern task force_invalid_state_at(pwrmgr_pkg::fast_pwr_state_e target);
   extern function void suspend_reset_forwarding_checks(bit suspend);
   extern task wait_for_invalid_state();
+  extern task wait_for_fast_state(pwrmgr_pkg::fast_pwr_state_e target);
   extern task let_time_pass(int unsigned steps);
   protected bit cur_escalation_reset;
   protected bit cur_esc_clk_stopped;
@@ -436,6 +456,44 @@ endtask : set_nvm_idle
 // the window. Answer for one rom and leave the rest reporting a finished, trustworthy check, so the
 // check is put under pressure without stalling on the others. From here the driver owns the answer
 // for the rest of the reset epoch.
+// Every rom answers independently. set_rom_response() holds the others passing, so no two roms
+// block at once; the device gates on all of them together, and only this reaches the combinations
+// that say the gate is an and rather than a first-match.
+task pwrmgr_rand_rst_safe_base_vseq::set_all_rom_responses(mubi4_t done[], mubi4_t good[]);
+  pwrmgr_fast_seq rom_response_seq;
+
+  rom_response_seq = pwrmgr_fast_seq::type_id::create("rom_response_seq");
+  rom_response_seq.item = pwrmgr_fast_item::type_id::create("req");
+  `DV_CHECK_RANDOMIZE_WITH_FATAL(rom_response_seq.item,
+                                 change_rom == 1'b1;
+                                 foreach (rom_done[i]) rom_done[i] == done[i];
+                                 foreach (rom_good[i]) rom_good[i] == good[i];)
+  rom_response_seq.start(p_sequencer.fast_sequencer_h, this);
+endtask : set_all_rom_responses
+
+
+// Stages the clock enables into the register model, for the write the caller is about to issue.
+//
+// Which of these fields a top has depends on the clocks it was built with, and a top without a usb
+// clock has neither usb field, so naming them directly would not compile there. The register is
+// asked what fields it holds instead of being asked for a field by name: asking by name for one
+// that does not exist is reported as a warning, which on a top without usb is every call.
+function void pwrmgr_rand_rst_safe_base_vseq::stage_clock_enables();
+  uvm_reg_field fields[$];
+
+  ral.control.get_fields(fields);
+  foreach (fields[i]) begin
+    case (fields[i].get_name())
+      "core_clk_en":       fields[i].set(config_params.core_clk_en);
+      "io_clk_en":         fields[i].set(config_params.io_clk_en);
+      "usb_clk_en_lp":     fields[i].set(config_params.usb_clk_en_lp);
+      "usb_clk_en_active": fields[i].set(config_params.usb_clk_en_active);
+      default: ;
+    endcase
+  end
+endfunction : stage_clock_enables
+
+
 task pwrmgr_rand_rst_safe_base_vseq::set_rom_response(int unsigned index, mubi4_t done,
                                                       mubi4_t good);
   pwrmgr_fast_seq rom_response_seq;
@@ -596,6 +654,17 @@ endfunction : suspend_reset_forwarding_checks
 // Ask for the state machine to be sent to its invalid state when it reaches a named state.
 // Naming the state is the sequence's part; waiting for it belongs to the driver, which owns that
 // interface.
+// The framework kills the fast driver's main thread at every reset and restarts it once reset is
+// stable, so a sequence that starts an item before the restart waits on a sequencer nothing is
+// pulling from. The reset that ends that window also kills the sequence, and the wait for a grant
+// is reported as a killed arbitration request rather than as the timing problem it is. Waiting on
+// the driver rather than on a number of cycles is what makes this independent of how long the
+// restart takes.
+task pwrmgr_rand_rst_safe_base_vseq::wait_for_fast_driver_running();
+  wait (cfg.m_fast_agent_cfg.driver_running);
+endtask : wait_for_fast_driver_running
+
+
 task pwrmgr_rand_rst_safe_base_vseq::force_invalid_state_at(
     pwrmgr_pkg::fast_pwr_state_e target);
   pwrmgr_fast_seq fsm_invalid_seq;
@@ -609,6 +678,29 @@ endtask : force_invalid_state_at
 
 
 // The device announces the state it is in, so this is an ordinary wait on a transaction.
+// Waits for the device to say it has reached a named state. A test that presents stimulus the
+// device only reads on its way up needs to know it has been read before taking it away, and the
+// state the device announces is the only thing that says so.
+task pwrmgr_rand_rst_safe_base_vseq::wait_for_fast_state(pwrmgr_pkg::fast_pwr_state_e target);
+  pwrmgr_fsm_item item;
+  int unsigned    seen = 0;
+  string          last = "nothing";
+  int unsigned    queued;
+
+  queued = p_sequencer.fsm_fifo.used();
+  `DV_SPINWAIT(forever begin
+                 p_sequencer.fsm_fifo.get(item);
+                 seen++;
+                 last = $sformatf("%0s at cycle %0d", item.state.name(), item.clk_count);
+                 if (item.state == target) break;
+               end,
+               $sformatf({"timed out waiting for the device to reach %0s ",
+                          "after %0d announcement(s), last %0s, %0d queued when the wait began"},
+                         target.name(), seen, last, queued),
+               fast_obs_timeout_ns())
+endtask : wait_for_fast_state
+
+
 task pwrmgr_rand_rst_safe_base_vseq::wait_for_invalid_state();
   pwrmgr_fsm_item item;
   int unsigned    seen = 0;

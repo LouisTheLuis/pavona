@@ -99,6 +99,7 @@ endtask : main_thread
 
 task pwrmgr_rst_safe_lowpower_invalid_vseq::start_low_power_transition();
   csr_wr(.ptr(ral.wakeup_en[0]), .value(config_params.wakeups_en));
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(config_params.main_pd_n);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));

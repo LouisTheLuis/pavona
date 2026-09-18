@@ -70,6 +70,7 @@ task pwrmgr_rst_safe_wakeup_vseq::run_wakeup_round();
   if (!config_params.keep_prior_wake_info) clear_recorded_wake_info();
   csr_wr(.ptr(ral.wake_info_capture_dis), .value(config_params.disable_wakeup_capture));
 
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(config_params.main_pd_n);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));

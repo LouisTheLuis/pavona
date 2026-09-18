@@ -65,6 +65,7 @@ task pwrmgr_rst_safe_sec_cm_ctrl_config_regwen_vseq::run_regwen_round();
   // They are pinned rather than skipped when they do not hold, which is what the legacy sequence
   // does. A round that cannot reach the register checks nothing. What `main_pd_n` does to a
   // transition is covered where it is the subject.
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(1'b1);
   ral.control.io_clk_en.set(1'b1);
@@ -91,6 +92,7 @@ task pwrmgr_rst_safe_sec_cm_ctrl_config_regwen_vseq::run_regwen_round();
 
   // Back from the transition, the lock is clear and the register takes a write again.
   csr_rd(.ptr(ral.ctrl_cfg_regwen), .value(rd_value));
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b0);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));
   csr_rd(.ptr(ral.control), .value(rd_value));

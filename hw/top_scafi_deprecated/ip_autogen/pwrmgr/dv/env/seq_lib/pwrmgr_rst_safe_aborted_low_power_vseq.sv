@@ -82,6 +82,7 @@ task pwrmgr_rst_safe_aborted_low_power_vseq::run_abort_round(bit by_processor);
                  .lc(config_params.lc_idle));
   end
 
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(config_params.main_pd_n);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));

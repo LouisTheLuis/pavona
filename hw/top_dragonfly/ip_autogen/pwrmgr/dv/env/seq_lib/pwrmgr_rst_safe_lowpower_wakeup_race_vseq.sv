@@ -63,6 +63,7 @@ task pwrmgr_rst_safe_lowpower_wakeup_race_vseq::run_race_round();
   csr_wr(.ptr(ral.intr_enable.wakeup), .value(config_params.en_intr));
   csr_wr(.ptr(ral.wake_info_capture_dis), .value(config_params.disable_wakeup_capture));
 
+  stage_clock_enables();
   ral.control.low_power_hint.set(1'b1);
   ral.control.main_pd_n.set(config_params.main_pd_n);
   csr_wr(.ptr(ral.control), .value(ral.control.get()));

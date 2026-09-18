@@ -150,6 +150,20 @@
       reseed: 50
     }
     {
+      name: pwrmgr_rst_safe_rom_blockers
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_rom_blockers_vseq
+      run_opts: ["+test_timeout_ns=${time_from_cycles(5760000)}"]
+      reseed: 50
+    }
+    {
+      name: pwrmgr_rst_safe_fsm_invalid_sweep
+      uvm_test: pwrmgr_rst_safe_base_test
+      uvm_test_seq: pwrmgr_rst_safe_fsm_invalid_sweep_vseq
+      run_opts: ["+test_timeout_ns=${time_from_cycles(5760000)}"]
+      reseed: 50
+    }
+    {
       name: pwrmgr_rst_safe_lowpower_invalid
       uvm_test: pwrmgr_rst_safe_base_test
       uvm_test_seq: pwrmgr_rst_safe_lowpower_invalid_vseq
@@ -302,6 +316,8 @@
               "pwrmgr_rst_safe_glitch", "pwrmgr_rst_safe_global_esc",
               "pwrmgr_rst_safe_escalation_timeout", "pwrmgr_rst_safe_esc_clk_rst_malfunc",
               "pwrmgr_rst_safe_sec_cm_ctrl_config_regwen", "pwrmgr_rst_safe_lowpower_invalid",
+              "pwrmgr_rst_safe_fsm_invalid_sweep",
+              "pwrmgr_rst_safe_rom_blockers",
               "pwrmgr_rst_safe_reset_invalid", "pwrmgr_rst_safe_lowpower_wakeup_race",
               "pwrmgr_rst_safe_repeat_wakeup_reset",
               "pwrmgr_rst_safe_disable_rom_integrity_check",
