@@ -2744,6 +2744,30 @@ pavona_test(
 )
 
 pavona_test(
+    name = "keymgr_dpe_sideload_acc_test",
+    srcs = ["keymgr_dpe_sideload_acc_test.c"],
+    exec_env = DRAGONFLY_TEST_ENVS,
+    verilator = verilator_params(timeout = "long"),
+    deps = [
+        "//hw/top:acc_c_regs",
+        "//hw/top/dt",
+        "//sw/acc/crypto:x25519_sideload",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/dif:acc",
+        "//sw/device/lib/dif:keymgr_dpe",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/runtime:print",
+        "//sw/device/lib/testing:acc_testutils",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing:keymgr_dpe_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+pavona_test(
     name = "keymgr_sideload_acc_simple_test",
     srcs = ["keymgr_sideload_acc_test.c"],
     copts = ["-DTEST_SIMPLE_CASE_ONLY"],
