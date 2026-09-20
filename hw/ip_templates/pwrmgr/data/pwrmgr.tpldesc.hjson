@@ -70,6 +70,18 @@
       type: "int"
       default: "1"
     }
+      {
+        name: "bus_clk_freq_hz"
+        desc: "frequency in hertz of the clock pwrmgr's bus side runs on for this top"
+        type: "int"
+        default: "24000000"
+      }
+      {
+        name: "aon_clk_freq_hz"
+        desc: "frequency in hertz of the always-on clock for this top"
+        type: "int"
+        default: "200000"
+      }
     {
       name: "module_instance_name"
       desc: "instance name in case there are multiple pwrmgr instances. Not yet implemented."

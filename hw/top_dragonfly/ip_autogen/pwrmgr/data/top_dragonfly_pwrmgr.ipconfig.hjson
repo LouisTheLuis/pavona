@@ -5,6 +5,8 @@
   instance_name: top_dragonfly_pwrmgr
   param_values:
   {
+    bus_clk_freq_hz: 250000000
+    aon_clk_freq_hz: 62500000
     NumWkups: 3
     Wkups:
     [

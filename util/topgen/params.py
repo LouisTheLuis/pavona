@@ -200,8 +200,24 @@ def get_pwrmgr_params(top: ConfigT) -> ParamsT:
     src_clks = [obj.name for obj in clocks.srcs.values() if not obj.aon]
 
     pwrmgr = find_module(top["module"], "pwrmgr")
+
+    # The bus and always-on clock frequencies this top runs pwrmgr at. The ratio between them
+    # decides how much bus clock work happens inside one always-on cycle, and it differs by a
+    # large factor between tops, so anything the testbench expresses in always-on cycles has to
+    # be derived from it rather than from a number measured on one top.
+    src_freqs = {sv.name: sv.freq for sv in clocks.srcs.values()}
+    src_freqs.update({dv.name: dv.freq for dv in clocks.derived_srcs.values()})
+
+    def _clk_freq(entry: object) -> int:
+        name = entry["clock"] if isinstance(entry, dict) else entry
+        return int(src_freqs[name])
+
+    pwrmgr_clk_srcs = pwrmgr.get("clock_srcs", {})
+
     ipgen_params = get_ipgen_params(pwrmgr)
     ipgen_params.update({
+        "bus_clk_freq_hz": _clk_freq(pwrmgr_clk_srcs["clk_i"]),
+        "aon_clk_freq_hz": _clk_freq(pwrmgr_clk_srcs["clk_slow_i"]),
         "NumWkups": n_wkups,
         "Wkups": top["wakeups"],
         "NumRstReqs": n_rstreqs,

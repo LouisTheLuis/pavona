@@ -43,9 +43,12 @@ function void pwrmgr_rst_safe_env::build_phase(uvm_phase phase);
   build_reset_domains();
   build_block_agents();
 
-  // The real slow clock is 200kHz. Running it faster costs nothing in what is being checked
-  // and saves a great deal of simulated time.
-  cfg.slow_clk_rst_vif.set_freq_mhz(7);
+  // The always-on clock runs at the ratio this top builds pwrmgr with, rather than at a fixed
+  // frequency: how much bus clock work fits inside one always-on cycle is what the crossings
+  // between the two domains have to tolerate, and the two tops differ by a factor of thirty. The
+  // period is taken from the bus clock rather than set absolutely, so the ratio holds whatever
+  // the bus clock randomized to.
+  cfg.slow_clk_rst_vif.set_period_ps(cfg.clk_rst_vif.clk_period_ps * BusCyclesPerAonCycle);
   cfg.esc_clk_rst_vif.set_freq_mhz(cfg.clk_rst_vif.clk_freq_mhz);
   cfg.lc_clk_rst_vif.set_freq_mhz(cfg.clk_rst_vif.clk_freq_mhz);
 endfunction : build_phase

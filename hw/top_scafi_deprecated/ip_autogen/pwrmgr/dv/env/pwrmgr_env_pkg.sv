@@ -31,6 +31,14 @@ package pwrmgr_env_pkg;
   parameter int NUM_INTERRUPTS = 1;
 
   // clk enable disable delay
+  // How many bus clock cycles this top fits inside one always-on cycle. Taken from the clock
+  // frequencies the top is built with rather than from a measurement, because the two tops differ
+  // by a large factor: one runs pwrmgr's bus clock at a hundred and twenty times its always-on
+  // clock and the other at four times. Anything the testbench counts in always-on cycles covers
+  // that many times more bus clock work on the first, so a number that lands where it should on
+  // one top lands somewhere else entirely on the other.
+  parameter uint BusCyclesPerAonCycle = 120;
+
   parameter uint MAIN_CLK_DELAY_MIN = 15;
   parameter uint MAIN_CLK_DELAY_MAX = 258;
   parameter uint ESC_CLK_DELAY_MIN = 1;

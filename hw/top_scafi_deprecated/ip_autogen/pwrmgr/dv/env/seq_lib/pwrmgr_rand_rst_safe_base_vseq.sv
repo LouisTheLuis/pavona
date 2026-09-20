@@ -77,7 +77,11 @@ class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
   // Long enough that a slow domain crossing and a full boot fit inside it, and short enough to
   // fail with a clear message instead of running into the phase timeout. It is a backstop, not
   // the thing that decides anything.
-  localparam int unsigned FastObsTimeoutNs = 200_000;
+  // Scaled by the ratio the top builds pwrmgr with, because this is a wall in simulated time and
+  // what it waits for is measured in always-on cycles. A top that fits more bus clock work into
+  // one of those takes proportionally longer to reach the same announcement, and a fixed wall
+  // would be a timeout on one top and slack on the other.
+  localparam int unsigned FastObsTimeoutNs = 50_000 * BusCyclesPerAonCycle;
 
   extern function new(string name = "");
 

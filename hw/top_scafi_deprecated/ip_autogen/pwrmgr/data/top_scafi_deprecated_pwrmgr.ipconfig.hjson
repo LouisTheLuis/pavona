@@ -5,6 +5,8 @@
   instance_name: top_scafi_deprecated_pwrmgr
   param_values:
   {
+    bus_clk_freq_hz: 24000000
+    aon_clk_freq_hz: 200000
     NumWkups: 3
     Wkups:
     [
