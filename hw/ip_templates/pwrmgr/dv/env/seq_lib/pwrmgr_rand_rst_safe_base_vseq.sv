@@ -9,11 +9,8 @@ class pwrmgr_rst_safe_test_seq_parameters extends dv_test_seq_parameters;
   // this on the power-on reset domain, which is the slow clock, so the numbers here are slow
   // cycles and not bus cycles.
   //
-  // The range is taken from a measured run: one low power operation takes about 10.6 us, which
-  // is roughly 74 cycles of the 7 MHz slow clock. Staying well inside that means reset lands
-  // while the operation is still going, whatever the operation count randomizes to. A delay
-  // that outlives the workload is not merely a weaker test: the base sequence warns when the
-  // main thread finishes first, and a warning fails the run.
+  // The range is derived from how long one operation takes on this top, which the package works
+  // out from the clock frequencies the top is built with.
   rand int unsigned reset_delay_steps;
 
   `uvm_object_utils(pwrmgr_rst_safe_test_seq_parameters)
@@ -27,7 +24,13 @@ class pwrmgr_rst_safe_test_seq_parameters extends dv_test_seq_parameters;
 
   constraint num_trans_c {num_trans inside {[1 : 3]};}
 
-  constraint reset_delay_steps_c {reset_delay_steps inside {[5 : 60]};}
+  // Reset has to land while the operation is still going. The upper bound is three quarters of
+  // how long one takes on this top, so it stays inside whatever the operation count randomizes
+  // to; a delay that outlives the workload is not merely a weaker test, because the base sequence
+  // warns when the main thread finishes first and a warning fails the run.
+  constraint reset_delay_steps_c {
+    reset_delay_steps inside {[2 : (LowPowerOpAonCycles * 3) / 4]};
+  }
 
   function new(string name = "");
     super.new(name);

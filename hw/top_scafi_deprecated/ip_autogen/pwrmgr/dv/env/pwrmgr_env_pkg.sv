@@ -39,6 +39,14 @@ package pwrmgr_env_pkg;
   // one top lands somewhere else entirely on the other.
   parameter uint BusCyclesPerAonCycle = 120;
 
+  // How long one low power operation takes, in always-on cycles. Measured on both tops as about
+  // twenty three always-on cycles of handshaking between the two domains plus about fifty bus
+  // clock cycles of work, and the bus part costs fewer always-on cycles the wider the ratio is.
+  // A reset meant to land inside the operation has to be placed against this rather than against
+  // a count taken on one top: the same number of always-on cycles overshoots on a top that fits
+  // more bus clock work into each of them.
+  parameter uint LowPowerOpAonCycles = 23 + 50 / BusCyclesPerAonCycle;
+
   parameter uint MAIN_CLK_DELAY_MIN = 15;
   parameter uint MAIN_CLK_DELAY_MAX = 258;
   parameter uint ESC_CLK_DELAY_MIN = 1;
