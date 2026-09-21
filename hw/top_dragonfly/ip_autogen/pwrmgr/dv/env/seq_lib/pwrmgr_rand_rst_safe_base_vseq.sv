@@ -74,14 +74,11 @@ class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
 
   `uvm_object_utils(pwrmgr_rand_rst_safe_base_vseq)
 
-  // Long enough that a slow domain crossing and a full boot fit inside it, and short enough to
-  // fail with a clear message instead of running into the phase timeout. It is a backstop, not
-  // the thing that decides anything.
-  // Scaled by the ratio the top builds pwrmgr with, because this is a wall in simulated time and
-  // what it waits for is measured in always-on cycles. A top that fits more bus clock work into
-  // one of those takes proportionally longer to reach the same announcement, and a fixed wall
-  // would be a timeout on one top and slack on the other.
-  localparam int unsigned FastObsTimeoutNs = 50_000 * BusCyclesPerAonCycle;
+  // How long a wait on something the device announces is given before it fails, counted in
+  // always-on clock cycles. A duration would not do: the clocks are randomized, so the same
+  // number of nanoseconds buys a different number of cycles on every seed, and what these waits
+  // are waiting for is paced by the always-on clock rather than by wall time.
+  localparam int unsigned FastObsTimeoutAonCycles = 2_000;
 
   extern function new(string name = "");
 
@@ -91,6 +88,8 @@ class pwrmgr_rand_rst_safe_base_vseq extends cip_rand_rst_safe_base_vseq #(
   extern virtual task post_start();
 
   // Synchronization on what the device announced.
+  // Converts the cycle count above using the period the clock was actually given.
+  extern protected function int unsigned fast_obs_timeout_ns();
   extern task discard_stale_observations();
   extern task wait_for_device_active();
   extern task wait_for_low_power_entry();
@@ -151,6 +150,13 @@ task pwrmgr_rand_rst_safe_base_vseq::dut_init();
 endtask : dut_init
 
 
+// The macro wants a duration, so the cycle count is turned into one here using the period the
+// clock was actually given rather than a figure fixed when this was written.
+function int unsigned pwrmgr_rand_rst_safe_base_vseq::fast_obs_timeout_ns();
+  return (FastObsTimeoutAonCycles * cfg.slow_clk_rst_vif.clk_period_ps) / 1000;
+endfunction : fast_obs_timeout_ns
+
+
 // Throw away anything already sitting in the fifos before new stimulus is applied. Otherwise the
 // next wait is satisfied by an item from earlier, and the sequence carries on as though the device
 // had responded to something it has not seen yet.
@@ -169,7 +175,7 @@ task pwrmgr_rand_rst_safe_base_vseq::wait_for_device_active();
                  p_sequencer.active_fifo.get(item);
                  if (item.fetch_en == lc_ctrl_pkg::On) break;
                end,
-               "timed out waiting for the device to become active", FastObsTimeoutNs)
+               "timed out waiting for the device to become active", fast_obs_timeout_ns())
   `uvm_info(`gfn, "The device is active", UVM_MEDIUM)
 endtask : wait_for_device_active
 
@@ -182,7 +188,7 @@ task pwrmgr_rand_rst_safe_base_vseq::wait_for_low_power_entry();
                  p_sequencer.low_power_fifo.get(item);
                  if (item.value) break;
                end,
-               "timed out waiting for low power entry", FastObsTimeoutNs)
+               "timed out waiting for low power entry", fast_obs_timeout_ns())
   `uvm_info(`gfn, "The device has entered low power", UVM_MEDIUM)
 endtask : wait_for_low_power_entry
 
@@ -196,7 +202,7 @@ task pwrmgr_rand_rst_safe_base_vseq::wait_for_wakeup_interrupt();
                  p_sequencer.intr_fifo.get(item);
                  if (item.value) break;
                end,
-               "timed out waiting for the wakeup interrupt", FastObsTimeoutNs)
+               "timed out waiting for the wakeup interrupt", fast_obs_timeout_ns())
   `uvm_info(`gfn, "The wakeup interrupt was raised", UVM_MEDIUM)
 endtask : wait_for_wakeup_interrupt
 
@@ -225,5 +231,5 @@ endtask : set_wakeups
 task pwrmgr_rand_rst_safe_base_vseq::propagate_to_slow_domain();
   csr_wr(.ptr(ral.cfg_cdc_sync), .value(1'b1));
   csr_spinwait(.ptr(ral.cfg_cdc_sync), .exp_data(1'b0), .spinwait_delay_ns(100),
-               .timeout_ns(FastObsTimeoutNs));
+               .timeout_ns(fast_obs_timeout_ns()));
 endtask : propagate_to_slow_domain
