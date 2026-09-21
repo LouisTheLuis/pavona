@@ -534,14 +534,15 @@
       run_opts: ["+use_spi_load_bootstrap=1", "+test_timeout_ns=80_000_000"]
       run_timeout_mins: 240
     }
-    {
-      name: chip_sw_inject_scramble_seed
-      uvm_test_seq: chip_sw_inject_scramble_seed_vseq
-      sw_images: ["//sw/device/tests/sim_dv:inject_scramble_seed:6:new_rules"]
-      en_run_modes: ["sw_test_mode_test_rom"]
-      run_opts: ["+lc_at_prod=1", "+flash_program_latency=5", "+sw_test_timeout_ns=150_000_000"]
-      run_timeout_mins: 300
-    }
+    // TODO (#631) We cannot rely on flash to test injection on dragonfly
+    // {
+    //   name: chip_sw_inject_scramble_seed
+    //   uvm_test_seq: chip_sw_inject_scramble_seed_vseq
+    //   sw_images: ["//sw/device/tests/sim_dv:inject_scramble_seed:6:new_rules"]
+    //   en_run_modes: ["sw_test_mode_test_rom"]
+    //   run_opts: ["+lc_at_prod=1", "+flash_program_latency=5", "+sw_test_timeout_ns=150_000_000"]
+    //   run_timeout_mins: 300
+    // }
     {
       name: chip_sw_exit_test_unlocked_bootstrap
       uvm_test_seq: chip_sw_exit_test_unlocked_bootstrap_vseq
@@ -1287,7 +1288,7 @@
       sw_images: ["//sw/device/tests/sim_dv:sram_ctrl_execution_main_test:6:new_rules"]
       en_run_modes: ["sw_test_mode_test_rom"]
     }
-// Refactor test to remove flash dependency
+// TODO: Refactor test to remove flash dependency
 //    {
 //      name: chip_sw_sleep_sram_ret_contents
 //      uvm_test_seq: chip_sw_base_vseq
@@ -1306,7 +1307,7 @@
       reseed: 1
       run_timeout_mins: 180
     }
-    // This test relies on sysrst_ctrl, which is not instantiated in dragonfly.
+    // TODO: This test relies on sysrst_ctrl, which is not instantiated in dragonfly.
     // {
     //   name: chip_sw_pwrmgr_b2b_sleep_reset_req
     //   uvm_test_seq: chip_sw_repeat_reset_wkup_vseq
@@ -1353,7 +1354,7 @@
       sw_images: ["//sw/device/tests:plic_sw_irq_test:6:new_rules"]
       en_run_modes: ["sw_test_mode_test_rom"]
     }
-// Refactor test to remove flash dependency
+// TODO: Refactor test to remove flash dependency
 //    {
 //      name: chip_sw_clkmgr_off_peri
 //      uvm_test_seq: chip_sw_base_vseq

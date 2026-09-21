@@ -16,21 +16,19 @@ class chip_sw_inject_scramble_seed_vseq extends chip_sw_base_vseq;
   virtual task dut_init(string reset_kind = "HARD");
     super.dut_init(reset_kind);
 
-    // make sure it is unlocked and empty to start
-    for (int i = 0; i < 4; i++) begin
-      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::FlashAddrKeySeedOffset + i*8,
-                                       '0);
-
-      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::FlashDataKeySeedOffset + i*8,
-                                       '0);
-
-      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::SramDataKeySeedOffset + i*8,
-                                       '0);
+    // Clear the OTP SRAM and flash seed data to start from an empty state.
+    for (int i = 0; i < otp_ctrl_reg_pkg::FlashAddrKeySeedSize; i += 8) begin
+      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::FlashAddrKeySeedOffset + i, '0);
+    end
+    for (int i = 0; i < otp_ctrl_reg_pkg::FlashDataKeySeedSize; i += 8) begin
+      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::FlashDataKeySeedOffset + i, '0);
+    end
+    for (int i = 0; i < otp_ctrl_reg_pkg::SramDataKeySeedSize; i += 8) begin
+      cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::SramDataKeySeedOffset + i, '0);
     end
 
 
-    cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::Secret1DigestOffset,
-                                     '0);
+    cfg.mem_bkdr_util_h[Otp].write64(otp_ctrl_reg_pkg::Secret1DigestOffset, '0);
 
 
     // make sure we are in prod state

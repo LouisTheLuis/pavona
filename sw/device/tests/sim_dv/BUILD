@@ -877,25 +877,34 @@ pavona_test(
 pavona_test(
     name = "inject_scramble_seed",
     srcs = ["inject_scramble_seed.c"],
-    exec_env = {"//hw/top_egret:sim_dv": None},
+    exec_env = {
+        "//hw/top_egret:sim_dv": None,
+        "//hw/top_dragonfly:sim_dv": None,
+    },
     deps = [
-        "//hw/top:flash_ctrl_c_regs",
         "//hw/top:otp_ctrl_c_regs",
-        "//hw/top_egret/sw/autogen:top_egret",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:mmio",
-        "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/dif:otp_ctrl",
         "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/dif:sram_ctrl",
         "//sw/device/lib/runtime:hart",
         "//sw/device/lib/runtime:irq",
         "//sw/device/lib/runtime:log",
-        "//sw/device/lib/testing:flash_ctrl_testutils",
         "//sw/device/lib/testing:otp_ctrl_testutils",
         "//sw/device/lib/testing:rand_testutils",
         "//sw/device/lib/testing:rstmgr_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
+    ] + pavona_select_top(
+        {
+            "egret": [
+                "//hw/top:flash_ctrl_c_regs",
+                "//sw/device/lib/dif:flash_ctrl",
+                "//sw/device/lib/testing:flash_ctrl_testutils",
+            ],
+        },
+        [],
+    ),
 )
 
 pavona_test(
