@@ -151,9 +151,9 @@ task pwrmgr_rand_rst_safe_base_vseq::dut_init();
 endtask : dut_init
 
 
-// Each publication is the event itself, so a wait is for the next one of its kind rather than a
-// scan of a stream. What is already queued is discarded first, so the event that satisfies the
-// wait is necessarily a consequence of the stimulus about to be applied.
+// Throw away anything already sitting in the fifos before new stimulus is applied. Otherwise the
+// next wait is satisfied by an item from earlier, and the sequence carries on as though the device
+// had responded to something it has not seen yet.
 task pwrmgr_rand_rst_safe_base_vseq::discard_stale_observations();
   p_sequencer.active_fifo.flush();
   p_sequencer.low_power_fifo.flush();
