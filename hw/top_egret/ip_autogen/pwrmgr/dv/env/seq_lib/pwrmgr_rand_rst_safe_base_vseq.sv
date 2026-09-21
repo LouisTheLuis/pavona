@@ -156,7 +156,10 @@ endtask : dut_init
 // The macro wants a duration, so the cycle count is turned into one here using the period the
 // clock was actually given rather than a figure fixed when this was written.
 function int unsigned pwrmgr_rand_rst_safe_base_vseq::fast_obs_timeout_ns();
-  return (FastObsTimeoutAonCycles * cfg.slow_clk_rst_vif.clk_period_ps) / 1000;
+  // Widened before multiplying. The period is an int, and on a top whose always-on clock is a
+  // long way below its bus clock the product leaves thirty two bits: it wraps to a small number
+  // and the wait then fails long before the device has had time to answer.
+  return int'((longint'(FastObsTimeoutAonCycles) * cfg.slow_clk_rst_vif.clk_period_ps) / 1000);
 endfunction : fast_obs_timeout_ns
 
 
