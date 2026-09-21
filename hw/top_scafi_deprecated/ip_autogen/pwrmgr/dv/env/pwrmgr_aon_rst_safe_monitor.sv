@@ -66,7 +66,7 @@ task pwrmgr_aon_rst_safe_monitor::collect_trans();
     rstreqs     = cfg.vif.rstreqs_i;
     sw_rst_req  = cfg.vif.sw_rst_req_i;
     ast_req     = cfg.vif.pwr_ast_req;
-    main_pwr_ok = cfg.vif.rst_main_n;
+    main_pwr_ok = cfg.vif.main_pwr_glitch_n;
     clk_count   = cfg.reset_domain.clk_rst_vif.posedge_count;
 
     if (!have_previous || wakeups !== prev_wakeups) begin

@@ -43,8 +43,8 @@ class pwrmgr_scoreboard extends cip_base_scoreboard #(
   task monitor_power_glitch();
     fork
       forever
-        @cfg.pwrmgr_vif.rst_main_n begin
-          if (cfg.pwrmgr_vif.rst_main_n == 1'b0 && `gmv(ral.control.main_pd_n)) begin
+        @cfg.pwrmgr_vif.main_pwr_glitch_n begin
+          if (cfg.pwrmgr_vif.main_pwr_glitch_n == 1'b0 && `gmv(ral.control.main_pd_n)) begin
             set_exp_alert("fatal_fault", 1, 500);
           end
         end

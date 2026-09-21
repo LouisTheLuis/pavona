@@ -126,12 +126,12 @@ class pwrmgr_base_vseq extends cip_base_vseq #(
     cfg.slow_clk_rst_vif.wait_for_reset(.wait_negedge(0));
     stop_randomizing_cycles();
     fork
-      // Deactivate rst_main_n to make sure the slow fsm won't be confused into thinking
-      // a power glitch occurred, and wait some cycles so testing doesn't start until any
-      // side-effects are cleared. This confusion can arise if a sequence with random resets
-      // gets reset while sending a power glitch.
+      // Take back any power glitch still in flight, so the slow fsm is not left thinking main
+      // power went away, and wait some cycles so testing does not start until the side effects
+      // have cleared. A sequence with random resets can be reset part way through a glitch,
+      // which is what leaves one in flight.
       begin
-        cfg.pwrmgr_vif.rst_main_n = 1'b1;
+        cfg.pwrmgr_vif.main_pwr_glitch_n = 1'b1;
         cfg.slow_clk_rst_vif.wait_clks(7);
       end
       begin
@@ -150,7 +150,7 @@ class pwrmgr_base_vseq extends cip_base_vseq #(
     super.post_apply_reset(reset_kind);
     if (reset_kind == "HARD") begin
       // Undo any pending resets.
-      cfg.pwrmgr_vif.rst_main_n = 1'b1;
+      cfg.pwrmgr_vif.main_pwr_glitch_n = 1'b1;
       cfg.pwrmgr_vif.update_resets(0);
     end
 

@@ -19,7 +19,30 @@ interface pwrmgr_if (
 
   // Ports to the dut side.
 
+  // Main power as a test asks for it. Taking it away is a power glitch, which is a thing the
+  // design has to react to, and it is independent of the domain reset modeled below.
+  logic                                                            main_pwr_glitch_n = 1'b1;
+
+  // The main power domain's power-on reset, built the way the reset manager builds it at the top
+  // level. That domain is held in reset for as long as the always-on domain is, and released two
+  // always-on cycles later, so its low window covers the always-on one at both ends. Driving the
+  // always-on reset on its own, as this testbench used to, is a combination the top cannot
+  // produce: the flop that captures the power report is the only stage in this path on the main
+  // domain reset, so leaving it out of the reset strands the value it held from before, and the
+  // synchronizer downstream publishes that stale value as a one cycle high before the real report
+  // has come back. The state machine reads that as the supply being good.
+  logic [1:0]                                                      main_pd_por_sr;
+
+  always_ff @(posedge clk_slow or negedge rst_slow_n) begin
+    if (!rst_slow_n) begin
+      main_pd_por_sr <= '0;
+    end else begin
+      main_pd_por_sr <= {main_pd_por_sr[0], 1'b1};
+    end
+  end
+
   logic                                                            rst_main_n;
+  assign rst_main_n = main_pd_por_sr[1] & main_pwr_glitch_n;
 
   pwrmgr_pkg::pwr_ast_req_t                                        pwr_ast_req;
   pwrmgr_pkg::pwr_ast_rsp_t                                        pwr_ast_rsp;
@@ -184,14 +207,14 @@ interface pwrmgr_if (
 
   // Sends a main power glitch and disables a design assertion that trips for power glitches.
   task automatic glitch_power_reset();
-    rst_main_n = 1'b0;
+    main_pwr_glitch_n = 1'b0;
     if (!internal_assertion_disabled) begin
       internal_assertion_disabled = 1'b1;
       `uvm_info("pwrmgr_if", "disabling power glitch related SVA", UVM_MEDIUM)
       $assertoff(1, tb.dut.u_slow_fsm.IntRstReq_A);
     end
     repeat (2) @(posedge clk_slow);
-    rst_main_n = 1'b1;
+    main_pwr_glitch_n = 1'b1;
   endtask
 
   // FIXME Move all these initializations to sequences.

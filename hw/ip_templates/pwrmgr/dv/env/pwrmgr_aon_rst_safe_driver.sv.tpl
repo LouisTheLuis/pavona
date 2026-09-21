@@ -57,7 +57,7 @@ function void pwrmgr_aon_rst_safe_driver::reset_interface_and_driver();
   cfg.vif.wakeups_i    <= '0;
   cfg.vif.rstreqs_i    <= '0;
   cfg.vif.sw_rst_req_i <= MuBi4False;
-  cfg.vif.rst_main_n   <= 1'b1;
+  cfg.vif.main_pwr_glitch_n <= 1'b1;
 
   io_clk_valid = 1'b0;
 
@@ -179,8 +179,8 @@ task pwrmgr_aon_rst_safe_driver::drive_item(pwrmgr_aon_item item);
   @(posedge cfg.vif.clk_slow);
 
   if (item.power_glitch) begin
-    cfg.vif.rst_main_n <= 1'b0;
+    cfg.vif.main_pwr_glitch_n <= 1'b0;
     repeat (item.glitch_width_slow_clks) @(posedge cfg.vif.clk_slow);
-    cfg.vif.rst_main_n <= 1'b1;
+    cfg.vif.main_pwr_glitch_n <= 1'b1;
   end
 endtask : drive_item
