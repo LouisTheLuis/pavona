@@ -130,12 +130,6 @@ task pwrmgr_rand_rst_safe_base_vseq::main_thread();
 endtask : main_thread
 
 
-// Nothing. Every sequence establishes what it needs for itself, which is what the other ported
-// blocks do. Waiting here would be wrong twice over: the framework calls this after reset has
-// been released rather than while it is held, and it calls it again after a test that raised a
-// fatal alert, where the device is already up and there is nothing to wait for. A sequence that
-// needs the bus waits for the device to report that the processor may run, at the point it needs
-// it.
 // The framework clears every interrupt register when the sequence ends, and it does that on the
 // bus outside main_thread(), where the reset-safe base has no way to terminate it as a unit. Its
 // own guard against this is `cfg.under_reset`, which nothing sets on the reset-safe path, so a
@@ -149,6 +143,12 @@ task pwrmgr_rand_rst_safe_base_vseq::post_start();
 endtask : post_start
 
 
+// Nothing. Every sequence establishes what it needs for itself, which is what the other ported
+// blocks do. Waiting here would be wrong twice over: the framework calls this after reset has
+// been released rather than while it is held, and it calls it again after a test that raised a
+// fatal alert, where the device is already up and there is nothing to wait for. A sequence that
+// needs the bus waits for the device to report that the processor may run, at the point it needs
+// it.
 task pwrmgr_rand_rst_safe_base_vseq::dut_init();
 endtask : dut_init
 

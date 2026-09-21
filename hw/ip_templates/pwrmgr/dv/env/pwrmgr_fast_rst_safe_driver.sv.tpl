@@ -13,6 +13,9 @@
 // This driver also drives the lifecycle and escalation reset pins. Those follow the grant it has
 // just issued, and this driver is not itself reset by them, so it can hold one asserted and
 // release it later without the process doing the holding being torn down part way through.
+//
+// A template for the same reason as the always-on driver: reporting clock status is written once
+// per clock the top has, and the set of clocks is decided when the top is built.
 class pwrmgr_fast_rst_safe_driver extends dv_rst_safe_base_driver #(
     .ITEM_T(pwrmgr_fast_item),
     .CFG_T (pwrmgr_fast_agent_cfg)

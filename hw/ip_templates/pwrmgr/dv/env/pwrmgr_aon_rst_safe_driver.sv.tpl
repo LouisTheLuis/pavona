@@ -14,6 +14,10 @@
 // Those belong here because they are consequences of the answer it just gave: the clocks exist
 // only while AST says the clock is valid, and rstmgr cannot release a leaf reset until that
 // clock is running again.
+//
+// A template because the clock handshake below is written once per clock the top has, and which
+// clocks exist is decided when the top is built. The monitor and the agent have no per clock code,
+// so they are plain source.
 class pwrmgr_aon_rst_safe_driver extends dv_rst_safe_base_driver #(
     .ITEM_T(pwrmgr_aon_item),
     .CFG_T (pwrmgr_aon_agent_cfg)
