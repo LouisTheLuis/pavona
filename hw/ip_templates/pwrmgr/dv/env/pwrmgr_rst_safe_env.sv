@@ -156,6 +156,13 @@ function void pwrmgr_rst_safe_env::connect_phase(uvm_phase phase);
   m_fast_agent.monitor.low_power_port.connect(virtual_sequencer.low_power_fifo.analysis_export);
   m_fast_agent.monitor.intr_port.connect(virtual_sequencer.intr_fifo.analysis_export);
 
+  // Collected here rather than in build_phase: an alert agent fills in its own interface handle
+  // during its build, which runs after this environment's.
+  foreach (cfg.m_alert_agent_cfgs[alert_name]) begin
+    cfg.m_aon_agent_cfg.alert_clk_rst_vifs.push_back(
+        cfg.m_alert_agent_cfgs[alert_name].vif.clk_rst_async_if);
+  end
+
   virtual_sequencer.aon_sequencer_h  = m_aon_agent.sequencer;
   virtual_sequencer.fast_sequencer_h = m_fast_agent.sequencer;
 endfunction : connect_phase

@@ -39,6 +39,7 @@ class pwrmgr_aon_rst_safe_driver extends dv_rst_safe_base_driver #(
   extern protected task answer_ast_requests();
   extern protected task clear_peripheral_requests_on_lc_reset();
   extern protected task manage_fast_domain();
+  extern protected task set_alert_clocks(bit running);
   extern protected task drive_items();
   extern protected task drive_item(pwrmgr_aon_item item);
 endclass : pwrmgr_aon_rst_safe_driver
@@ -65,10 +66,13 @@ function void pwrmgr_aon_rst_safe_driver::reset_interface_and_driver();
 
   io_clk_valid = 1'b0;
 
-  // The device's clock requests reset to zero, so AST stops providing the clocks.
+  // The device's clock requests reset to zero, so AST stops providing the clocks. The alert
+  // clocks go with them: the side that pings is as unclocked as the sender it pings while the
+  // source is away, here for the same reason as when the device asks for low power.
   cfg.fast_clk_rst_vif.stop_clk();
   cfg.lc_clk_rst_vif.stop_clk();
   cfg.esc_clk_rst_vif.stop_clk();
+  foreach (cfg.alert_clk_rst_vifs[i]) cfg.alert_clk_rst_vifs[i].stop_clk();
 
   // The device's other three resets are leaves of the power-on reset: rstmgr builds each from a
   // synchronizer that this reset clears directly, so they fall in the same instant with no clock
@@ -135,12 +139,28 @@ task pwrmgr_aon_rst_safe_driver::clear_peripheral_requests_on_lc_reset();
 endtask : clear_peripheral_requests_on_lc_reset
 
 
+// The alert clocks are taken away and given back with the rest. Only the generators the
+// environment granted this agent are touched; the alert agents themselves are left alone.
+task pwrmgr_aon_rst_safe_driver::set_alert_clocks(bit running);
+  foreach (cfg.alert_clk_rst_vifs[i]) begin
+    if (running) begin
+      // Restarted without advancing time, because this sits alongside the other clocks rather
+      // than waiting on any of them.
+      cfg.alert_clk_rst_vifs[i].start_clk(.wait_for_posedge(1'b0));
+    end else begin
+      cfg.alert_clk_rst_vifs[i].stop_clk();
+    end
+  end
+endtask : set_alert_clocks
+
+
 task pwrmgr_aon_rst_safe_driver::manage_fast_domain();
   forever begin
     wait (io_clk_valid === 1'b1);
     cfg.fast_clk_rst_vif.start_clk();
     cfg.lc_clk_rst_vif.start_clk();
     cfg.esc_clk_rst_vif.start_clk();
+    set_alert_clocks(1'b1);
 
     // The requirement is that the clock is running before the leaf can be released, not that a
     // particular number of cycles has passed. One edge establishes that; counting cycles beyond
@@ -159,6 +179,7 @@ task pwrmgr_aon_rst_safe_driver::manage_fast_domain();
     cfg.fast_clk_rst_vif.stop_clk();
     cfg.lc_clk_rst_vif.stop_clk();
     cfg.esc_clk_rst_vif.stop_clk();
+    set_alert_clocks(1'b0);
   end
 endtask : manage_fast_domain
 

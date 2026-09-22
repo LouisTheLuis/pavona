@@ -16,6 +16,13 @@ class pwrmgr_aon_agent_cfg extends dv_base_agent_cfg;
   virtual clk_rst_if lc_clk_rst_vif;
   virtual clk_rst_if esc_clk_rst_vif;
 
+  // The clocks the alert receivers ping on. Each alert interface generates one of its own, tied to
+  // nothing the device drives. On a chip both ends of an alert descend from the same source, so
+  // when the device gives that source up the pinging side stops with the sender it is pinging.
+  // Granted by the environment for the same reason as the three above: this agent answers for the
+  // clock source, so it is the one that takes these away and gives them back.
+  virtual clk_rst_if alert_clk_rst_vifs[$];
+
   // How long AST takes to answer, in slow clock cycles. These are randomized once when the
   // configuration is built and then left alone, because a response already in flight must not
   // have its delay changed underneath it: two requests close together would otherwise be
