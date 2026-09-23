@@ -104,12 +104,15 @@ task pwrmgr_rst_safe_scoreboard::process_wakeups();
     `DV_CHECK_FATAL(!in_reset(), "Wakeup observed while the power-on reset is asserted")
 
     enabled = last_wakeup.wakeups & wakeups_t'(`gmv(ral.wakeup_en[0]));
+    // The status register follows rather than remembers: the device drives it with its write
+    // enable tied high, so it shows the wakeups raised and enabled at this moment and drops them
+    // again when they go away. It does not hold the cause of a wake.
+    exp_wake_status = enabled;
+
+    // The recorded reasons are the ones that accumulate, and only inside the window the device
+    // opens when it enters low power. They are cleared by writing to their own register.
     if (in_low_power && enabled != '0) begin
-      // Replaced rather than accumulated: the status names the wakeups that caused this wake,
-      // not every wakeup seen since reset. The recorded reasons below do accumulate, which is
-      // why they are cleared through their own register instead.
-      exp_wake_status = enabled;
-      exp_intr_wakeup  = 1'b1;
+      exp_intr_wakeup = 1'b1;
       if (!`gmv(ral.wake_info_capture_dis)) exp_wake_info_reasons |= enabled;
     end
   end
@@ -191,7 +194,7 @@ task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels
     "wake_status": begin
       if (data_phase_read) begin
         `DV_CHECK_EQ(wakeups_t'(item.d_data), exp_wake_status,
-                     "wake_status does not name the wakeups the device was given")
+                     "wake_status does not match the expected value")
       end
       do_read_check = 1'b0;
     end
@@ -199,7 +202,7 @@ task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels
       if (data_phase_read) begin
         `DV_CHECK_EQ(wakeups_t'(get_field_val(ral.wake_info.reasons, item.d_data)),
                      exp_wake_info_reasons,
-                     "wake_info does not name the wakeups the device was given")
+                     "wake_info reasons do not match the expected value")
       end
       // Writing a one clears the recorded reasons, and capture has to be disabled to do it.
       if (data_phase_write && `gmv(ral.wake_info_capture_dis)) exp_wake_info_reasons = '0;
@@ -208,7 +211,7 @@ task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels
     "intr_state": begin
       if (data_phase_read) begin
         `DV_CHECK_EQ(bit'(get_field_val(ral.intr_state.wakeup, item.d_data)), exp_intr_wakeup,
-                     "intr_state does not match the wakeup the device was given")
+                     "intr_state wakeup does not match the expected value")
       end
       // Write one to clear.
       if (data_phase_write && get_field_val(ral.intr_state.wakeup, item.a_data)) begin
