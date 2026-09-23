@@ -19,7 +19,6 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
   localparam bit [31:0] MMIO_END_ADDRESS                 = 32'h30601000;
   localparam bit [31:0] CREATOR_FW_PHY_START_ADDRESS     = 32'h41000000;
   localparam bit [31:0] CREATOR_FW_SIZE_BYTES            = 32'h00080000;
-  localparam bit [31:0] ROM_CTRL1_ENTRY_POINT_OFFSET     = 32'h00000180;
 
   function logic [31:0] epmp_addr_napot(logic [31:0] addr, int unsigned length);
     return ((addr + (length >> 1) - 1) >> 2);
@@ -197,8 +196,7 @@ class chip_sw_rom_e2e_asm_init_vseq extends chip_sw_base_vseq;
 
     // Check ePMP address entries
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[0],
-                 epmp_addr_tor(top_dragonfly_pkg::TOP_DRAGONFLY_ROM_CTRL1_ROM_BASE_ADDR +
-                               ROM_CTRL1_ENTRY_POINT_OFFSET))
+                 epmp_addr_tor(top_dragonfly_pkg::TOP_DRAGONFLY_ROM_CTRL1_ROM_BASE_ADDR))
     `DV_CHECK_EQ(cfg.chip_vif.pmp_addr[2],
                  epmp_addr_napot(top_dragonfly_pkg::TOP_DRAGONFLY_ROM_CTRL1_ROM_BASE_ADDR,
                                  top_dragonfly_pkg::TOP_DRAGONFLY_ROM_CTRL1_ROM_SIZE_BYTES))
