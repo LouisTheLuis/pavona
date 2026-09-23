@@ -217,7 +217,8 @@ task pwrmgr_rand_rst_safe_base_vseq::set_processor_sleeping(bit sleeping);
   pwrmgr_fast_seq seq;
 
   seq = pwrmgr_fast_seq::type_id::create("fast_item_seq");
-  seq.core_sleeping_value = sleeping;
+  seq.item = pwrmgr_fast_item::type_id::create("req");
+  `DV_CHECK_RANDOMIZE_WITH_FATAL(seq.item, core_sleeping == local::sleeping;)
   seq.start(p_sequencer.fast_sequencer_h, this);
 endtask : set_processor_sleeping
 
@@ -226,7 +227,8 @@ task pwrmgr_rand_rst_safe_base_vseq::set_wakeups(wakeups_t wakeups);
   pwrmgr_aon_seq seq;
 
   seq = pwrmgr_aon_seq::type_id::create("aon_item_seq");
-  seq.wakeups_value = wakeups;
+  seq.item = pwrmgr_aon_item::type_id::create("req");
+  `DV_CHECK_RANDOMIZE_WITH_FATAL(seq.item, wakeups == local::wakeups;)
   seq.start(p_sequencer.aon_sequencer_h, this);
 endtask : set_wakeups
 

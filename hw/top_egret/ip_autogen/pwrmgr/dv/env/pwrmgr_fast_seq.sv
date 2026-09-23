@@ -10,7 +10,9 @@ class pwrmgr_fast_seq extends dv_base_seq #(
     .SEQUENCER_T(pwrmgr_fast_sequencer)
   );
 
-  bit core_sleeping_value;
+  // What to deliver. Built and randomized by the caller, for the same reason as on the
+  // always-on side.
+  pwrmgr_fast_item item;
 
   `uvm_object_utils(pwrmgr_fast_seq)
 
@@ -19,9 +21,8 @@ class pwrmgr_fast_seq extends dv_base_seq #(
   endfunction : new
 
   virtual task body();
-    req = pwrmgr_fast_item::type_id::create("req");
-    start_item(req);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(req, core_sleeping == core_sleeping_value;)
-    finish_item(req);
+    `DV_CHECK_FATAL(item != null, "Started without an item to carry")
+    start_item(item);
+    finish_item(item);
   endtask : body
 endclass : pwrmgr_fast_seq

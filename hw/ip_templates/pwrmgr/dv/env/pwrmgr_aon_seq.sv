@@ -17,7 +17,9 @@ class pwrmgr_aon_seq extends dv_base_seq #(
     .SEQUENCER_T(pwrmgr_aon_sequencer)
   );
 
-  wakeups_t wakeups_value;
+  // What to deliver. Built and randomized by the caller, which is the only place that knows which
+  // fields the request is about and what the rest should be left at.
+  pwrmgr_aon_item item;
 
   `uvm_object_utils(pwrmgr_aon_seq)
 
@@ -26,9 +28,8 @@ class pwrmgr_aon_seq extends dv_base_seq #(
   endfunction : new
 
   virtual task body();
-    req = pwrmgr_aon_item::type_id::create("req");
-    start_item(req);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(req, wakeups == wakeups_value;)
-    finish_item(req);
+    `DV_CHECK_FATAL(item != null, "Started without an item to carry")
+    start_item(item);
+    finish_item(item);
   endtask : body
 endclass : pwrmgr_aon_seq
