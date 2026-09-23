@@ -67,44 +67,48 @@
   // Enable cdc instrumentation.
   run_opts: ["+cdc_instrumentation_enabled=1"]
 
+  // Timeouts are a number of bus clock cycles, turned into nanoseconds with the clock frequency
+  // this top is built at. The bus clock is the one to count: nearly all of the time in these tests
+  // is register access and fast domain sequencing, so a top with a faster bus finishes sooner and
+  // gets a proportionally shorter timeout.
   // List of test specifications.
   tests: [
     {
       name: pwrmgr_smoke
       uvm_test_seq: pwrmgr_smoke_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_rst_safe_smoke
       uvm_test: pwrmgr_rst_safe_base_test
       uvm_test_seq: pwrmgr_rst_safe_smoke_vseq
-      run_opts: ["+test_timeout_ns=${2000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${1440000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_rst_safe_smoke_with_rand_reset
       uvm_test: pwrmgr_rst_safe_base_test
       uvm_test_seq: pwrmgr_rst_safe_smoke_with_rand_reset_vseq
-      run_opts: ["+test_timeout_ns=${4000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${2880000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_reset
       uvm_test_seq: pwrmgr_reset_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_lowpower_wakeup_race
       uvm_test_seq: pwrmgr_lowpower_wakeup_race_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_wakeup
       uvm_test_seq: pwrmgr_wakeup_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_wakeup_reset
       uvm_test_seq: pwrmgr_wakeup_reset_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_aborted_low_power
@@ -113,27 +117,27 @@
     {
       name: pwrmgr_sec_cm_lc_ctrl_intersig_mubi
       uvm_test_seq: pwrmgr_repeat_wakeup_reset_vseq
-      run_opts: ["+test_timeout_ns=${3000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}", "+pwrmgr_mubi_mode=PwrmgrMubiLcCtrl"]
+      run_opts: ["+test_timeout_ns=${2160000 * 10**9 // bus_clk_freq_hz}", "+pwrmgr_mubi_mode=PwrmgrMubiLcCtrl"]
     }
     {
       name: pwrmgr_sec_cm_rstmgr_intersig_mubi
       uvm_test_seq: pwrmgr_sw_reset_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_esc_clk_rst_malfunc
       uvm_test_seq: pwrmgr_esc_clk_rst_malfunc_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_sec_cm_ctrl_config_regwen
       uvm_test_seq: pwrmgr_sec_cm_ctrl_config_regwen_vseq
-      run_opts: ["+test_timeout_ns=${50000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${36000000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_global_esc
       uvm_test_seq: pwrmgr_global_esc_vseq
-      run_opts: ["+test_timeout_ns=${1000000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_escalation_timeout
@@ -142,22 +146,22 @@
     {
       name: pwrmgr_glitch
       uvm_test_seq: pwrmgr_glitch_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_disable_rom_integrity_check
       uvm_test_seq: pwrmgr_disable_rom_integrity_check_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_reset_invalid
       uvm_test_seq: pwrmgr_reset_invalid_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
     {
       name: pwrmgr_lowpower_invalid
       uvm_test_seq: pwrmgr_lowpower_invalid_vseq
-      run_opts: ["+test_timeout_ns=${1000000 * bus_clk_freq_hz // aon_clk_freq_hz // 4}"]
+      run_opts: ["+test_timeout_ns=${720000 * 10**9 // bus_clk_freq_hz}"]
     }
   ]
 
