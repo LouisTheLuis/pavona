@@ -310,10 +310,12 @@ void handle_page_program(void) {
 void spi_device_process_upload_fifo(void) {
   dif_irq_type_t irq_type;
   CHECK_DIF_OK(dif_spi_device_irq_get_type(
-      &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty, &irq_type));
+      &spi_device.dev, kDtSpiDeviceIrqUploadCmdfifoNotEmpty, &irq_type));
   if (irq_type == kDifIrqTypeEvent) {
     CHECK_DIF_OK(dif_spi_device_irq_acknowledge(
-        &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty));
+        &spi_device.dev, kDtSpiDeviceIrqUploadCmdfifoNotEmpty));
+    CHECK_DIF_OK(dif_spi_device_irq_acknowledge(
+        &spi_device.dev, kDtSpiDeviceIrqUploadPayloadNotEmpty));
   }
 
   // Uploaded commands should all set the busy bit, and WREN should have been
@@ -345,25 +347,26 @@ void spi_device_process_upload_fifo(void) {
   }
 
   CHECK_DIF_OK(dif_spi_device_irq_set_enabled(
-      &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty,
+      &spi_device.dev, kDtSpiDeviceIrqUploadCmdfifoNotEmpty,
+      kDifToggleEnabled));
+  CHECK_DIF_OK(dif_spi_device_irq_set_enabled(
+      &spi_device.dev, kDtSpiDeviceIrqUploadPayloadNotEmpty,
       kDifToggleEnabled));
 }
 
 /**
- * Check that the command FIFO is not empty, and mask the interrupt for deferred
- * processing.
+ * Check that the command or payload FIFO is not empty, and mask the interrupt
+ * for deferred processing.
  *
  * Runs in interrupt context.
  */
-void spi_device_isr(void) {
-  bool cmdfifo_not_empty;
-  CHECK_DIF_OK(dif_spi_device_irq_is_pending(
-      &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty,
-      &cmdfifo_not_empty));
-  CHECK(cmdfifo_not_empty);
-  CHECK_DIF_OK(dif_spi_device_irq_set_enabled(
-      &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty,
-      kDifToggleDisabled));
+void spi_device_isr(dt_spi_device_irq_t fifo_irq) {
+  bool fifo_not_empty;
+  CHECK_DIF_OK(dif_spi_device_irq_is_pending(&spi_device.dev, fifo_irq,
+                                             &fifo_not_empty));
+  CHECK(fifo_not_empty);
+  CHECK_DIF_OK(dif_spi_device_irq_set_enabled(&spi_device.dev, fifo_irq,
+                                              kDifToggleDisabled));
 }
 
 /**
@@ -379,8 +382,10 @@ void ottf_external_isr(uint32_t *exc_info) {
   if (peripheral_id == dt_spi_device_instance_id(kSpiDeviceDt)) {
     dt_spi_device_irq_t irq =
         dt_spi_device_irq_from_plic_id(kSpiDeviceDt, plic_irq_id);
-    CHECK(irq == kDtSpiDeviceIrqUploadCmdfifoNotEmpty);
-    spi_device_isr();
+    LOG_INFO("(PROBE): spi_device plic_irq_id=%d -> irq=%d", plic_irq_id, irq);
+    CHECK(irq == kDtSpiDeviceIrqUploadCmdfifoNotEmpty ||
+          irq == kDtSpiDeviceIrqUploadPayloadNotEmpty);
+    spi_device_isr(irq);
   }
 
   // Complete the IRQ at PLIC.
@@ -474,7 +479,7 @@ bool test_main(void) {
     bool cmdfifo_not_empty_irq_pending;
     irq_global_ctrl(/*en=*/false);
     CHECK_DIF_OK(dif_spi_device_irq_is_pending(
-        &spi_device.dev, kDifSpiDeviceIrqUploadCmdfifoNotEmpty,
+        &spi_device.dev, kDtSpiDeviceIrqUploadCmdfifoNotEmpty,
         &cmdfifo_not_empty_irq_pending));
     if (!cmdfifo_not_empty_irq_pending) {
       wait_for_interrupt();
