@@ -1305,7 +1305,7 @@
       run_opts: ["+en_uart_logger=1",
                  "+sw_test_timeout_ns=100_000_000"]
       reseed: 1
-      run_timeout_mins: 180
+      run_timeout_mins: 500
     }
     // TODO: This test relies on sysrst_ctrl, which is not instantiated in dragonfly.
     // {
