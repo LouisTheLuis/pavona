@@ -56,7 +56,7 @@ class chip_sw_lc_volatile_raw_unlock_vseq extends chip_sw_base_vseq;
         // The production ROM is not instrumented to report `sw_test_status`, so
         // we wait for the PC to advance before continuing with the test. The
         // PC was taken from the ROM disassembly.
-        `DV_WAIT(cfg.chip_vif.probed_cpu_pc.pc_wb >= 8194)
+        `DV_WAIT(cfg.chip_vif.probed_cpu_pc.pc_wb >= 'h8194)
       end else begin
         // In RAW state the ROM should halt as RomExecEn is not set yet.
         `DV_WAIT(cfg.sw_test_status_vif.sw_test_status == SwTestStatusInBootRomHalt)
@@ -78,4 +78,16 @@ class chip_sw_lc_volatile_raw_unlock_vseq extends chip_sw_base_vseq;
       `uvm_info(`gfn, "Transition failed as expected.", UVM_LOW)
     end
   endtask
+
+  // The production ROM halts in RAW state because ROM execution is not enabled
+  // in OTP, so no software runs and nothing ever writes a terminal test status.
+  // Waiting for one would only end at the software timeout.
+  virtual task wait_for_sw_test_done();
+    if (rom_prod_mode) begin
+      `uvm_info(`gfn, "Production ROM reports no test status, not waiting for one", UVM_LOW)
+      return;
+    end
+    super.wait_for_sw_test_done();
+  endtask
+
 endclass
