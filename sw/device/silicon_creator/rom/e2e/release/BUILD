@@ -11,6 +11,13 @@ load(
     "STD_OTP_OVERLAYS",
     "otp_image",
 )
+load(
+    "//rules/pavona:defs.bzl",
+    "dv_params",
+    "fpga_params",
+    "pavona_test",
+    "verilator_params",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -40,13 +47,17 @@ pavona_test(
     exec_env = {
         "//hw/top_egret:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_egret:sim_dv": None,
+        "//hw/top_egret:sim_verilator": None,
         "//hw/top_egret:silicon_creator": None,  # This is added to support GLS and bringup environments.
         "//hw/top_dragonfly:sim_dv": None,
+        "//hw/top_dragonfly:sim_verilator": None,
     },
     fpga = fpga_params(
         otp = ":otp_img_sigverify_spx_prod",
-        # This test is only used for DV or releasing a new ROM.
-        tags = ["skip_in_ci"],
+    ),
+    verilator = verilator_params(
+        rom = "//sw/device/silicon_creator/rom",
+        second_rom = "//sw/device/silicon_creator/second_rom",
     ),
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:prod_key_0_spx": "prod_key_0"},
@@ -57,6 +68,7 @@ pavona_test(
         "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib:chip_info",
+        "//sw/device/silicon_creator/lib/drivers:epmp",
         "//sw/device/silicon_creator/lib/drivers:hmac",
     ],
 )
