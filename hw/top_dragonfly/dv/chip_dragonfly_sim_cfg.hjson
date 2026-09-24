@@ -1705,7 +1705,6 @@
               "chip_rv_dm_ndm_reset_req",
               "chip_sw_rstmgr_sw_req",
               // "chip_sw_pwrmgr_sleep_disabled",
-              // "base_rom_e2e_smoke",
               "chip_sw_aes_idle",
               // TODO: uncomment when these run with Xcelium.
               // "chip_sw_pwrmgr_main_power_glitch_reset",
