@@ -70,6 +70,14 @@ class chip_sw_rom_e2e_jtag_inject_vseq extends chip_sw_base_vseq;
       `uvm_info(`gfn, "WDOG is not enabled.", UVM_LOW)
     end
 
+    // The injected program executes out of main SRAM, so instruction fetch has to be enabled
+    // there before control is handed to it.
+    `uvm_info(`gfn, "Enable SRAM instruction fetch", UVM_LOW)
+    cfg.debugger.mem_write(.addr(ral.sram_ctrl_main_regs.exec.get_address()),
+                           .value_q({prim_mubi_pkg::MuBi4True}),
+                           .status(status));
+    `DV_CHECK_EQ(status, 0)
+
     // See additional notes on the PMP configuration in the GDB script referenced above.
     `uvm_info(`gfn, "Configure the PMP unit", UVM_LOW)
     // "Write "L NAPOT X W R" to pmp{0,1,2,3}cfg in pmpcfg0. Crucially, this value is no less
@@ -93,7 +101,7 @@ class chip_sw_rom_e2e_jtag_inject_vseq extends chip_sw_base_vseq;
       `DV_CHECK(result)
       sram_program_gp = BUS_AW'(addr);
       result = dv_utils_pkg::sw_symbol_get_addr_size(.elf_file(elf_file),
-          .symbol("sram_main"), .does_not_exist_ok(0), .addr(addr), .size(size));
+          .symbol("test_main"), .does_not_exist_ok(0), .addr(addr), .size(size));
       `DV_CHECK(result)
       sram_program_start = BUS_AW'(addr);
     end
@@ -112,11 +120,8 @@ class chip_sw_rom_e2e_jtag_inject_vseq extends chip_sw_base_vseq;
                                         .status(abs_status));
     `DV_CHECK_EQ(abs_status, jtag_rv_debugger_pkg::AbstractCmdErrNone)
 
-    `uvm_info(`gfn, "Invalidate the icache", UVM_LOW)
-    cfg.debugger.call(.symbol("icache_invalidate"));
-
-    `uvm_info(`gfn, "Call sram_main (it writes the PASS pattern to the DV monitor)", UVM_LOW)
-    cfg.debugger.call(.symbol("sram_main"), .noreturn_function(1));
+    `uvm_info(`gfn, "Call test_main (it writes the PASS pattern to the DV monitor)", UVM_LOW)
+    cfg.debugger.call(.symbol("test_main"), .noreturn_function(1));
   endtask
 
 endclass
