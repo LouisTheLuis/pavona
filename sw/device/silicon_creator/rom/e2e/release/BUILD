@@ -55,12 +55,12 @@ pavona_test(
     fpga = fpga_params(
         otp = ":otp_img_sigverify_spx_prod",
     ),
+    manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+    spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:prod_key_0_spx": "prod_key_0"},
     verilator = verilator_params(
         rom = "//sw/device/silicon_creator/rom",
         second_rom = "//sw/device/silicon_creator/second_rom",
     ),
-    manifest = "//sw/device/silicon_creator/rom_ext:manifest",
-    spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:prod_key_0_spx": "prod_key_0"},
     deps = [
         "//hw/top/dt:rom_ctrl",
         "//sw/device/lib/base:status",
