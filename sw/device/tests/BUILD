@@ -6594,11 +6594,14 @@ test_suite(
     pavona_test(
         name = "rv_dm_access_after_wakeup_{}".format(lc_state),
         srcs = ["rv_dm_access_after_wakeup.c"],
-        exec_env = {
-            "//hw/top_egret:fpga_cw310_sival": None,
-            "//hw/top_egret:fpga_cw340_sival": None,
-            "//hw/top_egret:sim_dv": None,
-        },
+        exec_env = dicts.add(
+            DRAGONFLY_TEST_ENVS,
+            {
+                "//hw/top_egret:fpga_cw310_sival": None,
+                "//hw/top_egret:fpga_cw340_sival": None,
+                "//hw/top_egret:sim_dv": None,
+            },
+        ),
         fpga = fpga_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
@@ -6612,30 +6615,43 @@ test_suite(
             test_harness = "//sw/host/tests/chip/rv_dm:access_after_wakeup",
         ),
         deps = [
+            "//hw/top/dt",
             "//sw/device/lib/base:abs_mmio",
             "//sw/device/lib/base:mmio",
             "//sw/device/lib/dif:alert_handler",
             "//sw/device/lib/dif:aon_timer",
-            "//sw/device/lib/dif:flash_ctrl",
             "//sw/device/lib/dif:pinmux",
             "//sw/device/lib/dif:pwrmgr",
             "//sw/device/lib/dif:rstmgr",
             "//sw/device/lib/dif:rv_plic",
             "//sw/device/lib/dif:rv_timer",
-            "//sw/device/lib/dif:sysrst_ctrl",
             "//sw/device/lib/runtime:irq",
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing:alert_handler_testutils",
             "//sw/device/lib/testing:aon_timer_testutils",
-            "//sw/device/lib/testing:flash_ctrl_testutils",
             "//sw/device/lib/testing:pinmux_testutils",
             "//sw/device/lib/testing:pwrmgr_testutils",
+            "//sw/device/lib/testing:ret_sram_testutils",
             "//sw/device/lib/testing:rstmgr_testutils",
             "//sw/device/lib/testing:rv_plic_testutils",
             "//sw/device/lib/testing/test_framework:check",
             "//sw/device/lib/testing/test_framework:ottf_main",
             "//sw/device/lib/testing/test_framework:ottf_utils",
-        ],
+            "//sw/device/tests:pwrmgr_sleep_resets_lib",
+        ] + pavona_select_top(
+            {
+                "egret": [
+                    "//sw/device/lib/dif:flash_ctrl",
+                    "//sw/device/lib/dif:sysrst_ctrl",
+                    "//sw/device/lib/testing:flash_ctrl_testutils",
+                ],
+                "dragonfly": [
+                    "//sw/device/lib/dif:gpio",
+                    "//sw/device/lib/testing:rand_testutils",
+                ],
+            },
+            [],
+        ),
     )
     for lc_state, lc_state_val in _RV_DM_JTAG_LC_STATES
 ]
