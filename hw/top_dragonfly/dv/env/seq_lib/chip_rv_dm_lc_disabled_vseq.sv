@@ -82,8 +82,11 @@ class chip_rv_dm_lc_disabled_vseq extends chip_stub_cpu_base_vseq;
     otp_write_lc_partition_state(cfg.mem_bkdr_util_h[Otp], lc_state);
   endfunction
 
-  virtual function void initialize_otp_sig_verify();
+  // The base sequence reloads the OTP image on every dut_init, so the life cycle state has to be
+  // written after that reload for it to take effect.
+  virtual function void initialize_otp_lc_state();
     backdoor_override_otp();
+    super.initialize_otp_lc_state();
   endfunction
 
   // Returns true if the RV_DM is accessible in a certain life cycle state.
@@ -122,21 +125,26 @@ class chip_rv_dm_lc_disabled_vseq extends chip_stub_cpu_base_vseq;
     dv_base_reg_field flds[$];
     bit [TL_AW-1:0] addr = csr.get_address();
     bit [TL_DW-1:0] data = $urandom();
+    // The CPU data port has its own life cycle gate, which answers with zero data and no error
+    // before the access reaches RV_DM. The stub CPU goes through it, so when the CPU is disabled
+    // the RV_DM gate is never exercised and the blank response is what has to be seen.
+    bit cpu_en = cfg.chip_vif.get_lc_ctrl_enable_signal(LcCtrlSignalCpuEn) == lc_ctrl_pkg::On;
+    bit exp_err = gated && cpu_en;
     `downcast(dv_reg, csr)
     dv_reg.get_dv_base_reg_fields(flds);
     if (flds[0].get_access() inside {"RW", "WO"}) begin
       `uvm_info(`gfn, $sformatf("Write addr %0h, write adata %0h, exp error %0d",
-                addr, data, gated), UVM_HIGH);
-      tl_access(.addr(addr), .write(1), .data(data), .exp_err_rsp(gated));
+                addr, data, exp_err), UVM_HIGH);
+      tl_access(.addr(addr), .write(1), .data(data), .exp_err_rsp(exp_err));
     end
-    // Most RV_DM registers cannot be predicted correctly.
-    // We hence only check whether the accesses below error out or not.
-    // In case of an error, the data read back must be all ones.
+    // Most RV_DM registers cannot be predicted correctly, so an open gate only checks that the
+    // access does not error out. A closed RV_DM gate reads back all ones, and a closed CPU gate
+    // reads back zero.
     if (flds[0].get_access() inside {"RW", "RO"}) begin
       `uvm_info(`gfn, $sformatf("Read addr %0h, exp error %0d",
-                addr, gated), UVM_HIGH);
-      tl_access(.addr(addr), .write(0), .data(data), .exp_err_rsp(gated),
-                .check_exp_data(gated), .exp_data('1));
+                addr, exp_err), UVM_HIGH);
+      tl_access(.addr(addr), .write(0), .data(data), .exp_err_rsp(exp_err),
+                .check_exp_data(gated), .exp_data(cpu_en ? '1 : '0));
     end
   endtask
 
