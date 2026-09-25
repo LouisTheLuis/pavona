@@ -428,11 +428,11 @@ class i2c_rst_safe_scoreboard extends cip_rst_safe_scoreboard #(
       forever begin
         uint acqlvl, txlvl;
         bit timeout_ctrl_en;
-        fork
-          wait (cfg.intr_vif.pins[StretchTimeout]);
-          wait (cfg.intr_vif.pins[TxStretch]);
-          wait (cfg.intr_vif.pins[AcqStretch]);
-        join_any
+        // One wait on the combined condition. A fork of one wait per pin
+        // joined with join_any leaves the other waits blocked, and this loop
+        // runs every clock cycle of a stretch, so those threads pile up.
+        wait (cfg.intr_vif.pins[StretchTimeout] || cfg.intr_vif.pins[TxStretch] ||
+              cfg.intr_vif.pins[AcqStretch]);
         csr_rd(.ptr(ral.target_fifo_status.acqlvl), .value(acqlvl), .backdoor(UVM_BACKDOOR));
         csr_rd(.ptr(ral.target_fifo_status.txlvl), .value(txlvl), .backdoor(UVM_BACKDOOR));
         cov.scl_stretch_cg.sample(.host_mode(`gmv(ral.ctrl.enablehost)),
