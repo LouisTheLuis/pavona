@@ -156,7 +156,6 @@ output_groups(
     ),
 )
 
-
 genrule(
     name = "second_rom_hashes",
     testonly = True,
