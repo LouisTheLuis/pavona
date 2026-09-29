@@ -67,10 +67,10 @@
   // Enable cdc instrumentation.
   run_opts: ["+cdc_instrumentation_enabled=1"]
 
-  // Timeouts are a number of bus clock cycles, turned into nanoseconds with the clock frequency
-  // this top is built at. The bus clock is the one to count: nearly all of the time in these tests
-  // is register access and fast domain sequencing, so a top with a faster bus finishes sooner and
-  // gets a proportionally shorter timeout.
+  // Timeouts are written as a number of bus clock cycles and converted by `time_from_cycles`
+  // above. The bus clock is the one to count: nearly all of the time in these tests is register
+  // access and fast domain sequencing, so a top with a faster bus finishes sooner and gets a
+  // proportionally shorter timeout.
   // List of test specifications.
   tests: [
     {

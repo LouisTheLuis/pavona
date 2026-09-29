@@ -1,6 +1,11 @@
 // Copyright lowRISC contributors (OpenTitan project).
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
+<%
+  # Rounded up so a top whose two frequencies do not divide exactly gets an always-on cycle at
+  # least as long as the real one. Matches the cycle conversions in sw/device/lib/testing.
+  bus_cycles_per_aon_cycle = (bus_clk_freq_hz + aon_clk_freq_hz - 1) // aon_clk_freq_hz
+%>\
 
 package pwrmgr_env_pkg;
   // dep packages
@@ -37,7 +42,10 @@ package pwrmgr_env_pkg;
   // clock and the other at four times. Anything the testbench counts in always-on cycles covers
   // that many times more bus clock work on the first, so a number that lands where it should on
   // one top lands somewhere else entirely on the other.
-  parameter uint BusCyclesPerAonCycle = ${bus_clk_freq_hz // aon_clk_freq_hz};
+  // The ratio is rounded up, so a top whose two frequencies do not divide exactly is modeled with
+  // an always-on cycle at least as long as the real one rather than a shorter one. Both tops
+  // built today divide exactly, so the rounding does not move either of them.
+  parameter uint BusCyclesPerAonCycle = ${bus_cycles_per_aon_cycle};
 
   // How long one low power operation takes, in always-on cycles. Measured on both tops as about
   // twenty three always-on cycles of handshaking between the two domains plus about fifty bus
@@ -45,7 +53,10 @@ package pwrmgr_env_pkg;
   // A reset meant to land inside the operation has to be placed against this rather than against
   // a count taken on one top: the same number of always-on cycles overshoots on a top that fits
   // more bus clock work into each of them.
-  parameter uint LowPowerOpAonCycles = 23 + 50 / BusCyclesPerAonCycle;
+  // The bus part is rounded up to a whole always-on cycle: fifty bus cycles is less than one
+  // always-on cycle on a top with a wide ratio, and truncating it to zero would claim the
+  // operation is shorter than it is.
+  parameter uint LowPowerOpAonCycles = 23 + (50 + BusCyclesPerAonCycle - 1) / BusCyclesPerAonCycle;
 
   parameter uint MAIN_CLK_DELAY_MIN = 15;
   parameter uint MAIN_CLK_DELAY_MAX = 258;
