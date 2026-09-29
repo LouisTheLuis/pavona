@@ -165,9 +165,9 @@ endtask : process_low_power
 
 // Register traffic. A write is predicted when it is issued; a read is compared against the
 // mirror unless the register is one the hardware writes, since the value of those is decided by
-// what the device did rather than by what software last wrote. Predicting those is the
-// reference model's work, which checkpoint 2 adds, so they are read and recorded here without
-// being checked rather than checked against a value this scoreboard cannot yet know.
+// what the device did rather than by what software last wrote. Predicting those needs a model
+// of the device this scoreboard does not have, so they are read and recorded here without being
+// checked rather than checked against a value it cannot know.
 task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels_e channel,
                                                    string ral_name);
   uvm_reg        csr;
@@ -219,7 +219,7 @@ task pwrmgr_rst_safe_scoreboard::process_tl_access(tl_seq_item item, tl_channels
       end
       do_read_check = 1'b0;
     end
-    // Still unpredicted: these need the rest of the model, which is checkpoint 2.
+    // Still unpredicted: saying what these hold needs a model of what the device did.
     "ctrl_cfg_regwen", "reset_status", "escalate_reset_status", "fault_status", "control": begin
       do_read_check = 1'b0;
     end
