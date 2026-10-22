@@ -210,9 +210,9 @@ bool test_main(void) {
 #if defined(OPENTITAN_IS_DRAGONFLY)
     // These two should fail since the partitions do not have a digest.
     CHECK(dif_otp_ctrl_dai_digest(&otp, kOtpPartitionOwnershipSlotState,
-                                  0xAAAAAAAA) == kDifError);
+                                  0xAAAAAAAA) == kDifBadArg);
     CHECK(dif_otp_ctrl_dai_digest(&otp, kOtpPartitionExtNvm, 0xAAAAAAAA) ==
-          kDifError);
+          kDifBadArg);
 #endif
     // Reset the chip
     CHECK_DIF_OK(dif_rstmgr_software_device_reset(&rstmgr));
