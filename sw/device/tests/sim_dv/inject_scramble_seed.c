@@ -92,8 +92,8 @@ static void randomize_otp_seed_key(uint32_t key_offset, uint32_t key_size) {
   for (uint32_t i = 0; i < key_size; i += sizeof(uint64_t)) {
     uint64_t rand_val =
         (uint64_t)rand_testutils_gen32() << 32 | rand_testutils_gen32();
-    CHECK_DIF_OK(dif_otp_ctrl_dai_program64(
-        &otp_ctrl, kDifOtpCtrlPartitionSecret1, key_offset + i, rand_val));
+    CHECK_DIF_OK(dif_otp_ctrl_dai_program64(&otp_ctrl, kOtpPartitionSecret1,
+                                            key_offset + i, rand_val));
     CHECK_STATUS_OK(otp_ctrl_testutils_wait_for_dai(&otp_ctrl));
   };
 }
